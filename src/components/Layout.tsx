@@ -27,6 +27,7 @@ export function Layout() {
           <strong>CMS Seguros</strong>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/clientes">Clientes</Link>
+          <Link to="/importar">Importar</Link>
         </nav>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           {user?.email ? <span>{user.email}</span> : null}

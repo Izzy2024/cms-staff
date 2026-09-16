@@ -1,0 +1,363 @@
+import readXlsxFile from "read-excel-file/browser";
+
+export type CampoSistema =
+  | "cliente"
+  | "aseguradora"
+  | "tipoProductoTexto"
+  | "numeroPoliza"
+  | "vigenciaTexto"
+  | "prima"
+  | "observaciones";
+
+export interface InfoCampoSistema {
+  clave: CampoSistema;
+  etiqueta: string;
+  requerido: boolean;
+  descripcion: string;
+}
+
+export const CAMPOS_SISTEMA: InfoCampoSistema[] = [
+  { clave: "cliente", etiqueta: "Cliente", requerido: true, descripcion: "Nombre del cliente" },
+  { clave: "aseguradora", etiqueta: "Compañía de seguros", requerido: false, descripcion: "Aseguradora (ej. ASSA, Mapfre)" },
+  { clave: "tipoProductoTexto", etiqueta: "Tipo de producto / Bien", requerido: false, descripcion: "Detalle del producto o bien asegurado" },
+  { clave: "numeroPoliza", etiqueta: "Número de póliza", requerido: true, descripcion: "Identificador único de la póliza" },
+  { clave: "vigenciaTexto", etiqueta: "Vigencia", requerido: true, descripcion: "Rango de fechas ej. 16/9/2026 al 16/09/2027" },
+  { clave: "prima", etiqueta: "Prima", requerido: false, descripcion: "Monto de la prima" },
+  { clave: "observaciones", etiqueta: "Observaciones", requerido: false, descripcion: "Notas o comentarios adicionales" },
+];
+
+export interface MapeoColumnas {
+  cliente: number | null;
+  aseguradora: number | null;
+  tipoProductoTexto: number | null;
+  numeroPoliza: number | null;
+  vigenciaTexto: number | null;
+  prima: number | null;
+  observaciones: number | null;
+}
+
+export interface PolizaValida {
+  filaNumero: number;
+  clienteNombre: string;
+  aseguradora: string;
+  tipoProductoTexto: string;
+  numeroPoliza: string;
+  vigenciaInicio: string;
+  vigenciaFin: string;
+  prima: number;
+  observaciones: string;
+}
+
+export interface ClienteAgrupado {
+  nombre: string;
+  polizas: PolizaValida[];
+}
+
+export interface ErrorFilaImportacion {
+  filaNumero: number;
+  motivo: string;
+  datosFila?: Record<string, string>;
+}
+
+export interface ResultadoProcesamiento {
+  totalFilas: number;
+  filasValidas: PolizaValida[];
+  clientesAgrupados: ClienteAgrupado[];
+  errores: ErrorFilaImportacion[];
+}
+
+function normalizarTexto(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+/**
+ * Parsea una fecha en formato D(D)/M(M)/YYYY o D(D)-M(M)-YYYY
+ * y retorna string ISO YYYY-MM-DD o null si es inválida.
+ */
+function parseFechaDmy(fechaStr: string): string | null {
+  const match = fechaStr.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (!match) return null;
+
+  const dia = parseInt(match[1], 10);
+  const mes = parseInt(match[2], 10);
+  const anio = parseInt(match[3], 10);
+
+  if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || anio < 1900 || anio > 2100) {
+    return null;
+  }
+
+  return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
+/**
+ * Parsea un rango de vigencia tipo "16/9/2026 al 16/09/2027", "16/09/2026 - 16/09/2027", etc.
+ * Retorna las fechas de inicio y fin en formato ISO YYYY-MM-DD.
+ */
+export function parseVigenciaRango(
+  texto: unknown,
+): { vigenciaInicio: string; vigenciaFin: string } | null {
+  if (texto === null || texto === undefined) return null;
+  const str = String(texto).trim();
+  if (!str) return null;
+
+  const regex = /(\d{1,2}[/-]\d{1,2}[/-]\d{4})\s*(?:al?|hasta|-|–|—)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})/i;
+  const match = str.match(regex);
+  if (!match) return null;
+
+  const fInicio = parseFechaDmy(match[1]);
+  const fFin = parseFechaDmy(match[2]);
+
+  if (!fInicio || !fFin) return null;
+  return { vigenciaInicio: fInicio, vigenciaFin: fFin };
+}
+
+/**
+ * Parsea un monto de prima a número.
+ */
+export function parsePrima(valor: unknown): number {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? Math.max(0, valor) : 0;
+  }
+  if (!valor) return 0;
+  let str = String(valor).trim().replace(/[^0-9.,-]/g, "");
+  if (!str) return 0;
+  if (str.includes(",") && str.includes(".")) {
+    str = str.replace(/,/g, "");
+  } else if (str.includes(",")) {
+    str = str.replace(",", ".");
+  }
+  const parsed = parseFloat(str);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+}
+
+/**
+ * Sugiere el mapeo automático de columnas basándose en los encabezados del archivo.
+ */
+export function detectarMapeoColumnas(headers: string[]): MapeoColumnas {
+  const normalizados = headers.map((h) => normalizarTexto(h));
+
+  const mapeo: MapeoColumnas = {
+    cliente: null,
+    aseguradora: null,
+    tipoProductoTexto: null,
+    numeroPoliza: null,
+    vigenciaTexto: null,
+    prima: null,
+    observaciones: null,
+  };
+
+  const patrones: Record<CampoSistema, string[]> = {
+    cliente: ["cliente", "nombre del cliente", "asegurado", "tomador", "nombre"],
+    aseguradora: ["compania de seguros", "compañia de seguros", "compania", "compañia", "aseguradora", "empresa aseguradora"],
+    tipoProductoTexto: ["tipo de producto", "producto", "bien", "tipo", "ramo", "detalle"],
+    numeroPoliza: ["numero de poliza", "no. de poliza", "no. poliza", "no poliza", "nro poliza", "poliza"],
+    vigenciaTexto: ["vigencia", "periodo", "fechas de vigencia", "fechas"],
+    prima: ["prima", "costo", "monto", "importe"],
+    observaciones: ["observaciones", "observacion", "notas", "comentarios"],
+  };
+
+  for (const [campo, keywords] of Object.entries(patrones) as [CampoSistema, string[]][]) {
+    for (const keyword of keywords) {
+      const idx = normalizados.findIndex((h) => h === keyword || h.includes(keyword));
+      if (idx !== -1) {
+        mapeo[campo] = idx;
+        break;
+      }
+    }
+  }
+
+  return mapeo;
+}
+
+/**
+ * Parsea un contenido CSV delimitado por comas o puntos y comas.
+ */
+export function parsearCsv(texto: string): { headers: string[]; filas: unknown[][] } {
+  const lineas = texto
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0);
+
+  if (lineas.length === 0) return { headers: [], filas: [] };
+
+  const primeraLinea = lineas[0];
+  const comaCount = (primeraLinea.match(/,/g) || []).length;
+  const puntoComaCount = (primeraLinea.match(/;/g) || []).length;
+  const delimitador = puntoComaCount > comaCount ? ";" : ",";
+
+  const rows = lineas.map((linea) => {
+    const row: string[] = [];
+    let actual = "";
+    let entreComillas = false;
+
+    for (let i = 0; i < linea.length; i++) {
+      const c = linea[i];
+      if (c === '"') {
+        if (entreComillas && linea[i + 1] === '"') {
+          actual += '"';
+          i++;
+        } else {
+          entreComillas = !entreComillas;
+        }
+      } else if (c === delimitador && !entreComillas) {
+        row.push(actual.trim());
+        actual = "";
+      } else {
+        actual += c;
+      }
+    }
+    row.push(actual.trim());
+    return row;
+  });
+
+  const headers = rows[0].map((h) => h.trim());
+  const filas = rows.slice(1).filter((r) => r.some((c) => c.length > 0));
+
+  return { headers, filas };
+}
+
+/**
+ * Lee un archivo .xlsx o .csv en el navegador.
+ */
+export async function leerArchivoExcel(
+  archivo: File,
+): Promise<{ headers: string[]; filas: unknown[][] }> {
+  const nombre = archivo.name.toLowerCase();
+  if (nombre.endsWith(".csv") || archivo.type.includes("csv") || archivo.type.includes("text")) {
+    const texto = await archivo.text();
+    return parsearCsv(texto);
+  }
+
+  const resultado = await readXlsxFile(archivo);
+  if (!resultado || resultado.length === 0) {
+    return { headers: [], filas: [] };
+  }
+
+  // En read-excel-file v9, readXlsxFile retorna Sheet[] donde cada sheet tiene { sheet: string, data: Row[] }
+  const primerElemento = resultado[0] as unknown;
+  const data: unknown[][] =
+    primerElemento !== null &&
+    typeof primerElemento === "object" &&
+    "data" in primerElemento &&
+    Array.isArray((primerElemento as { data: unknown }).data)
+      ? ((primerElemento as { data: unknown[][] }).data)
+      : (resultado as unknown as unknown[][]);
+
+  if (!data || data.length === 0) {
+    return { headers: [], filas: [] };
+  }
+
+  const headers = (data[0] ?? []).map((c) => String(c ?? "").trim());
+  const filas = data.slice(1).filter((row) =>
+    row.some((cell) => cell !== null && cell !== undefined && String(cell).trim() !== ""),
+  );
+
+  return { headers, filas };
+}
+
+/**
+ * Procesa las filas según el mapeo de columnas, valida cada una,
+ * agrupa por nombre exacto de cliente y genera la lista de errores.
+ */
+export function procesarFilas(
+  filas: unknown[][],
+  mapeo: MapeoColumnas,
+): ResultadoProcesamiento {
+  const filasValidas: PolizaValida[] = [];
+  const errores: ErrorFilaImportacion[] = [];
+
+  let filaNumero = 1;
+  for (const fila of filas) {
+    filaNumero++;
+
+    const estaVacia = fila.every(
+      (celda) => celda === null || celda === undefined || String(celda).trim() === "",
+    );
+    if (estaVacia) continue;
+
+    const clienteValor = mapeo.cliente !== null ? String(fila[mapeo.cliente] ?? "").trim() : "";
+    const aseguradoraValor = mapeo.aseguradora !== null ? String(fila[mapeo.aseguradora] ?? "").trim() : "";
+    const tipoProductoValor = mapeo.tipoProductoTexto !== null ? String(fila[mapeo.tipoProductoTexto] ?? "").trim() : "";
+    const numeroPolizaValor = mapeo.numeroPoliza !== null ? String(fila[mapeo.numeroPoliza] ?? "").trim() : "";
+    const vigenciaTextoValor = mapeo.vigenciaTexto !== null ? String(fila[mapeo.vigenciaTexto] ?? "").trim() : "";
+    const primaValor = mapeo.prima !== null ? parsePrima(fila[mapeo.prima]) : 0;
+    const observacionesValor = mapeo.observaciones !== null ? String(fila[mapeo.observaciones] ?? "").trim() : "";
+
+    if (!clienteValor) {
+      errores.push({
+        filaNumero,
+        motivo: "Falta el nombre del cliente",
+        datosFila: {
+          cliente: "(vacío)",
+          numeroPoliza: numeroPolizaValor || "(vacío)",
+          vigencia: vigenciaTextoValor || "(vacío)",
+        },
+      });
+      continue;
+    }
+
+    if (!numeroPolizaValor) {
+      errores.push({
+        filaNumero,
+        motivo: "Falta el número de póliza",
+        datosFila: {
+          cliente: clienteValor,
+          numeroPoliza: "(vacío)",
+          vigencia: vigenciaTextoValor || "(vacío)",
+        },
+      });
+      continue;
+    }
+
+    const vigencia = parseVigenciaRango(vigenciaTextoValor);
+    if (!vigencia) {
+      errores.push({
+        filaNumero,
+        motivo: `Formato de vigencia inválido: "${vigenciaTextoValor || "(vacío)"}"`,
+        datosFila: {
+          cliente: clienteValor,
+          numeroPoliza: numeroPolizaValor,
+          vigencia: vigenciaTextoValor || "(vacío)",
+        },
+      });
+      continue;
+    }
+
+    filasValidas.push({
+      filaNumero,
+      clienteNombre: clienteValor,
+      aseguradora: aseguradoraValor,
+      tipoProductoTexto: tipoProductoValor,
+      numeroPoliza: numeroPolizaValor,
+      vigenciaInicio: vigencia.vigenciaInicio,
+      vigenciaFin: vigencia.vigenciaFin,
+      prima: primaValor,
+      observaciones: observacionesValor,
+    });
+  }
+
+  // Agrupación por nombre exacto de cliente
+  const clientesMap = new Map<string, PolizaValida[]>();
+  for (const poliza of filasValidas) {
+    const lista = clientesMap.get(poliza.clienteNombre) ?? [];
+    lista.push(poliza);
+    clientesMap.set(poliza.clienteNombre, lista);
+  }
+
+  const clientesAgrupados: ClienteAgrupado[] = Array.from(clientesMap.entries()).map(
+    ([nombre, polizas]) => ({
+      nombre,
+      polizas,
+    }),
+  );
+
+  return {
+    totalFilas: filasValidas.length + errores.length,
+    filasValidas,
+    clientesAgrupados,
+    errores,
+  };
+}
