@@ -37,31 +37,23 @@ export async function subirDocumento(
     `clientes/${clienteId}/polizas/${polizaId}/${docRef.id}-${nombreSeguro(archivo.name)}`,
   );
 
-  await uploadBytes(archivoRef, archivo);
-
-  let urlStorage: string;
   try {
-    urlStorage = await getDownloadURL(archivoRef);
-  } catch (error) {
-    await deleteObject(archivoRef).catch(() => undefined);
-    throw error;
-  }
+    await uploadBytes(archivoRef, archivo);
+    const urlStorage = await getDownloadURL(archivoRef);
 
-  const documento: Omit<DocumentoPoliza, "id"> = {
-    nombreArchivo: archivo.name,
-    tipoDocumento,
-    urlStorage,
-    fechaSubida: new Date().toISOString(),
-  };
+    const documento: Omit<DocumentoPoliza, "id"> = {
+      nombreArchivo: archivo.name,
+      tipoDocumento,
+      urlStorage,
+      fechaSubida: new Date().toISOString(),
+    };
 
-  try {
     await setDoc(docRef, documento);
-  } catch (error) {
+    return { id: docRef.id, ...documento };
+  } catch {
     await deleteObject(archivoRef).catch(() => undefined);
-    throw error;
+    throw new Error("No se pudo subir el documento. Revise su conexión e intente de nuevo.");
   }
-
-  return { id: docRef.id, ...documento };
 }
 
 export async function eliminarDocumento(

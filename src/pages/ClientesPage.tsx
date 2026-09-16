@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus, Search } from "lucide-react";
 import { listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Input } from "../components/ui/input.tsx";
+import { Cargando } from "../components/Cargando.tsx";
+import { MensajeError } from "../components/MensajeError.tsx";
 
 function coincide(item: ClienteConPolizas, termino: string): boolean {
   const t = termino.trim().toLowerCase();
@@ -23,7 +28,7 @@ export function ClientesPage() {
   useEffect(() => {
     listClientesConPolizas()
       .then(setItems)
-      .catch(() => setError("No se pudo cargar la lista de clientes."))
+      .catch(() => setError("No se pudo cargar la lista de clientes. Revise su conexión e intente de nuevo."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -31,66 +36,83 @@ export function ClientesPage() {
 
   return (
     <section>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        <h1>Clientes</h1>
-        <Link to="/clientes/nuevo">
-          <button type="button" style={{ fontSize: "16px", padding: "10px 16px" }}>
-            + Agregar cliente
-          </button>
-        </Link>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
+        <Button nativeButton={false} render={<Link to="/clientes/nuevo" />}>
+          <Plus aria-hidden="true" />
+          Agregar cliente
+        </Button>
       </div>
 
-      <input
-        type="search"
-        placeholder="Buscar por nombre, cédula, aseguradora o número de póliza"
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        style={{ fontSize: "16px", padding: "10px", width: "100%", marginTop: "16px", boxSizing: "border-box" }}
-      />
+      <div className="mt-6 flex flex-col gap-2">
+        <label htmlFor="buscador-clientes" className="text-base font-medium text-foreground">
+          Buscar cliente
+        </label>
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            id="buscador-clientes"
+            type="search"
+            className="pl-10"
+            placeholder="Nombre, cédula, aseguradora o número de póliza"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+      </div>
 
-      {loading ? <p style={{ marginTop: "16px" }}>Cargando…</p> : null}
-      {error ? (
-        <p role="alert" style={{ color: "#b00020", marginTop: "16px" }}>
-          {error}
-        </p>
-      ) : null}
+      {loading ? <Cargando mensaje="Cargando clientes…" /> : null}
+
+      {error ? <MensajeError className="mt-6">{error}</MensajeError> : null}
+
       {!loading && !error && filtrados.length === 0 ? (
-        <p style={{ marginTop: "16px" }}>No se encontraron clientes.</p>
+        <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/40 px-6 py-12 text-center">
+          <h2 className="text-xl font-semibold text-foreground">
+            {items.length === 0 ? "Todavía no hay clientes" : "Sin resultados"}
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-base text-muted-foreground">
+            {items.length === 0
+              ? "Agregue su primer cliente con el botón «Agregar cliente»."
+              : "No se encontró ningún cliente con esa búsqueda. Pruebe con otro nombre, cédula o número de póliza."}
+          </p>
+        </div>
       ) : null}
 
-      <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
-        {filtrados.map(({ cliente, polizas }) => (
-          <Link
-            key={cliente.id}
-            to={`/clientes/${cliente.id}`}
-            style={{ textDecoration: "none", color: "inherit" }}
-          >
-            <div style={{ border: "1px solid #e5e4e7", borderRadius: "8px", padding: "16px" }}>
-              <h2 style={{ margin: 0 }}>{cliente.nombre}</h2>
-              <p style={{ margin: "4px 0", color: "#555" }}>
-                Cédula: {cliente.cedula} · Tel: {cliente.telefono}
+      {!loading && !error && filtrados.length > 0 ? (
+        <div className="mt-6 flex flex-col gap-4">
+          {filtrados.map(({ cliente, polizas }) => (
+            <Link
+              key={cliente.id}
+              to={`/clientes/${cliente.id}`}
+              className="block rounded-xl border border-border bg-card p-4 break-words transition-colors hover:border-primary"
+            >
+              <h2 className="text-xl font-semibold text-foreground">{cliente.nombre}</h2>
+              <p className="mt-1 text-base text-muted-foreground">
+                Cédula: {cliente.cedula} · Teléfono: {cliente.telefono}
                 {cliente.email ? ` · ${cliente.email}` : ""}
               </p>
+
               {polizas.length === 0 ? (
-                <p style={{ margin: "8px 0 0", color: "#777" }}>Sin pólizas registradas.</p>
+                <p className="mt-3 text-base text-muted-foreground">Sin pólizas registradas.</p>
               ) : (
-                <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
+                <ul className="mt-3 flex flex-col gap-2">
                   {polizas.map((p) => (
-                    <li key={p.id} style={{ margin: "4px 0" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        <span>
-                          {p.aseguradora} · {p.tipoSeguro} · Póliza {p.numeroPoliza} (vence {p.vigenciaFin})
-                        </span>
-                        <RenovacionBadge vigenciaFin={p.vigenciaFin} />
+                    <li key={p.id} className="flex flex-wrap items-center gap-2 text-base text-foreground">
+                      <span>
+                        {p.aseguradora} · {p.tipoSeguro} · Póliza {p.numeroPoliza} (vence {p.vigenciaFin})
                       </span>
+                      <RenovacionBadge vigenciaFin={p.vigenciaFin} />
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

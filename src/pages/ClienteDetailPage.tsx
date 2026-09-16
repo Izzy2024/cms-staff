@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import {
   createCliente,
   createPoliza,
@@ -15,6 +16,10 @@ import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
 import { DocumentosPoliza } from "../components/DocumentosPoliza.tsx";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Input } from "../components/ui/input.tsx";
+import { Cargando } from "../components/Cargando.tsx";
+import { MensajeError } from "../components/MensajeError.tsx";
 
 const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
 
@@ -36,13 +41,18 @@ export function ClienteDetailPage() {
     Promise.all([getCliente(clienteId), listPolizas(clienteId)])
       .then(([cliente, listaPolizas]) => {
         if (!cliente) {
-          setError("Cliente no encontrado.");
+          setError("No se encontró este cliente. Puede que se haya eliminado.");
           return;
         }
-        setDatos({ nombre: cliente.nombre, cedula: cliente.cedula, telefono: cliente.telefono, email: cliente.email ?? "" });
+        setDatos({
+          nombre: cliente.nombre,
+          cedula: cliente.cedula,
+          telefono: cliente.telefono,
+          email: cliente.email ?? "",
+        });
         setPolizas(listaPolizas);
       })
-      .catch(() => setError("No se pudo cargar el cliente."))
+      .catch(() => setError("No se pudo cargar la ficha del cliente. Revise su conexión e intente de nuevo."))
       .finally(() => setLoading(false));
   }, [clienteId, esNuevo]);
 
@@ -52,7 +62,11 @@ export function ClienteDetailPage() {
     setGuardando(true);
     try {
       const email = datos.email?.trim();
-      const payload: Omit<Cliente, "id"> = { nombre: datos.nombre, cedula: datos.cedula, telefono: datos.telefono };
+      const payload: Omit<Cliente, "id"> = {
+        nombre: datos.nombre,
+        cedula: datos.cedula,
+        telefono: datos.telefono,
+      };
       if (email) payload.email = email;
       if (esNuevo) {
         const nuevoId = await createCliente(payload);
@@ -61,7 +75,7 @@ export function ClienteDetailPage() {
         await updateCliente(clienteId, payload);
       }
     } catch {
-      setError("No se pudo guardar el cliente.");
+      setError("No se pudieron guardar los datos del cliente. Intente de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -82,87 +96,104 @@ export function ClienteDetailPage() {
 
   async function handleEliminarPoliza(polizaId: string): Promise<void> {
     if (!clienteId) return;
-    if (!window.confirm("¿Eliminar esta póliza?")) return;
-    await deletePoliza(clienteId, polizaId);
-    setPolizas(await listPolizas(clienteId));
+    if (!window.confirm("¿Seguro que desea eliminar esta póliza? Esta acción no se puede deshacer.")) return;
+    setError("");
+    try {
+      await deletePoliza(clienteId, polizaId);
+      setPolizas(await listPolizas(clienteId));
+    } catch {
+      setError("No se pudo eliminar la póliza. Intente de nuevo.");
+    }
   }
 
-  if (loading) return <p>Cargando…</p>;
+  if (loading) return <Cargando mensaje="Cargando la ficha del cliente…" />;
 
   return (
     <section>
-      <h1>{esNuevo ? "Nuevo cliente" : "Ficha de cliente"}</h1>
-      {error ? (
-        <p role="alert" style={{ color: "#b00020" }}>
-          {error}
-        </p>
+      {!esNuevo && clienteId ? (
+        <Link
+          to="/clientes"
+          className="inline-flex h-11 items-center gap-2 text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-5" aria-hidden="true" />
+          Volver a clientes
+        </Link>
       ) : null}
+
+      <h1 className="mt-2 text-3xl font-bold text-foreground">
+        {esNuevo ? "Nuevo cliente" : "Ficha de cliente"}
+      </h1>
+
+      {error ? <MensajeError className="mt-4">{error}</MensajeError> : null}
 
       <form
         onSubmit={handleGuardarDatos}
-        style={{ display: "grid", gap: "12px", maxWidth: "480px", border: "1px solid #e5e4e7", borderRadius: "8px", padding: "16px" }}
+        className="mt-6 grid max-w-xl gap-5 rounded-xl border border-border bg-card p-4 sm:p-5"
       >
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          Nombre
-          <input
+        <label className="flex flex-col gap-2 text-base font-medium text-foreground">
+          Nombre completo
+          <Input
             required
             value={datos.nombre}
             onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
-            style={{ fontSize: "16px", padding: "8px" }}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+
+        <label className="flex flex-col gap-2 text-base font-medium text-foreground">
           Cédula
-          <input
+          <Input
             required
             value={datos.cedula}
             onChange={(e) => setDatos({ ...datos, cedula: e.target.value })}
-            style={{ fontSize: "16px", padding: "8px" }}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+
+        <label className="flex flex-col gap-2 text-base font-medium text-foreground">
           Teléfono
-          <input
+          <Input
+            type="tel"
             required
             value={datos.telefono}
             onChange={(e) => setDatos({ ...datos, telefono: e.target.value })}
-            style={{ fontSize: "16px", padding: "8px" }}
           />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          Email (opcional)
-          <input
+
+        <label className="flex flex-col gap-2 text-base font-medium text-foreground">
+          Correo electrónico (opcional)
+          <Input
             type="email"
             value={datos.email ?? ""}
             onChange={(e) => setDatos({ ...datos, email: e.target.value })}
-            style={{ fontSize: "16px", padding: "8px" }}
           />
         </label>
-        <button type="submit" disabled={guardando} style={{ fontSize: "16px", padding: "10px 16px" }}>
-          {guardando ? "Guardando…" : "Guardar datos"}
-        </button>
+
+        <div>
+          <Button type="submit" disabled={guardando}>
+            <Save aria-hidden="true" />
+            {guardando ? "Guardando…" : "Guardar datos"}
+          </Button>
+        </div>
       </form>
 
       {!esNuevo && clienteId ? (
-        <div style={{ marginTop: "32px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h2>Pólizas</h2>
+        <div className="mt-10">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-2xl font-bold text-foreground">Pólizas</h2>
             {!mostrarFormPoliza ? (
-              <button
-                type="button"
+              <Button
                 onClick={() => {
                   setPolizaEditando(null);
                   setMostrarFormPoliza(true);
                 }}
-                style={{ fontSize: "16px", padding: "10px 16px" }}
               >
-                + Agregar póliza
-              </button>
+                <Plus aria-hidden="true" />
+                Agregar póliza
+              </Button>
             ) : null}
           </div>
 
           {mostrarFormPoliza ? (
-            <div style={{ marginTop: "12px" }}>
+            <div className="mt-4">
               <PolizaForm
                 inicial={polizaEditando ?? undefined}
                 onGuardar={handleGuardarPoliza}
@@ -174,37 +205,69 @@ export function ClienteDetailPage() {
             </div>
           ) : null}
 
-          <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
-            {polizas.length === 0 ? <p>Sin pólizas registradas.</p> : null}
+          <div className="mt-4 flex flex-col gap-4">
+            {polizas.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-muted/40 px-6 py-10 text-center">
+                <p className="text-lg font-medium text-foreground">Este cliente todavía no tiene pólizas</p>
+                <p className="mx-auto mt-2 max-w-md text-base text-muted-foreground">
+                  Use el botón «Agregar póliza» para registrar la primera.
+                </p>
+              </div>
+            ) : null}
+
             {polizas.map((p) => (
-              <div key={p.id} style={{ border: "1px solid #e5e4e7", borderRadius: "8px", padding: "16px" }}>
-                <p style={{ margin: 0, fontWeight: "bold" }}>
-                  {p.aseguradora} · {p.tipoSeguro}
-                </p>
-                <p style={{ margin: "4px 0" }}>Póliza: {p.numeroPoliza}</p>
-                {p.detalleBien ? <p style={{ margin: "4px 0" }}>{p.detalleBien}</p> : null}
-                <p style={{ margin: "4px 0", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span>
-                    Vigencia: {p.vigenciaInicio} a {p.vigenciaFin}
-                  </span>
+              <div key={p.id} className="rounded-xl border border-border bg-card p-4 break-words">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-xl font-semibold text-foreground">
+                    {p.aseguradora} · {p.tipoSeguro}
+                  </h3>
                   <RenovacionBadge vigenciaFin={p.vigenciaFin} />
-                </p>
-                <p style={{ margin: "4px 0" }}>Prima: {p.prima}</p>
-                {p.observaciones ? <p style={{ margin: "4px 0" }}>{p.observaciones}</p> : null}
-                <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                  <button
-                    type="button"
+                </div>
+
+                <div className="mt-3 flex flex-col gap-1 text-base text-foreground">
+                  <p>
+                    <span className="text-muted-foreground">Número de póliza: </span>
+                    <strong>{p.numeroPoliza}</strong>
+                  </p>
+                  {p.detalleBien ? (
+                    <p>
+                      <span className="text-muted-foreground">Bien asegurado: </span>
+                      {p.detalleBien}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-muted-foreground">Vigencia: </span>
+                    {p.vigenciaInicio} al {p.vigenciaFin}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Prima: </span>
+                    {p.prima}
+                  </p>
+                  {p.observaciones ? (
+                    <p>
+                      <span className="text-muted-foreground">Observaciones: </span>
+                      {p.observaciones}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       setPolizaEditando(p);
                       setMostrarFormPoliza(true);
                     }}
                   >
+                    <Pencil aria-hidden="true" />
                     Editar
-                  </button>
-                  <button type="button" onClick={() => handleEliminarPoliza(p.id)}>
+                  </Button>
+                  <Button variant="destructive" onClick={() => void handleEliminarPoliza(p.id)}>
+                    <Trash2 aria-hidden="true" />
                     Eliminar
-                  </button>
+                  </Button>
                 </div>
+
                 <DocumentosPoliza clienteId={clienteId} polizaId={p.id} />
               </div>
             ))}

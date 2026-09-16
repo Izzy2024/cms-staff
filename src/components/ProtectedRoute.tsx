@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.tsx";
+import { Cargando } from "./Cargando.tsx";
 
 interface ProtectedRouteProps {
   children: ReactElement;
@@ -11,7 +12,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   if (loading) {
-    return <p>Cargando…</p>;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Cargando mensaje="Verificando tu sesión…" />
+      </div>
+    );
   }
 
   if (!user) {

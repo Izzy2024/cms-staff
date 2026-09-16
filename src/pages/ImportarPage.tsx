@@ -7,12 +7,13 @@ import {
   ArrowRight,
   CheckCircle2,
   FileSpreadsheet,
+  ShieldCheck,
   Upload,
   Users,
-  ShieldCheck,
 } from "lucide-react";
 import { Button } from "../components/ui/button.tsx";
 import { Badge } from "../components/ui/badge.tsx";
+import { MensajeError } from "../components/MensajeError.tsx";
 import { createCliente, createPoliza } from "../lib/clientesRepo.ts";
 import {
   CAMPOS_SISTEMA,
@@ -27,6 +28,9 @@ import type {
 } from "../lib/importadorExcel.ts";
 
 type PasoImportacion = "subir" | "mapear" | "previsualizar" | "resultado";
+
+const claseCampo =
+  "h-11 w-full rounded-lg border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function ImportarPage() {
   const navigate = useNavigate();
@@ -66,11 +70,11 @@ export function ImportarPage() {
     try {
       const { headers: headersLeidos, filas } = await leerArchivoExcel(file);
       if (headersLeidos.length === 0) {
-        setErrorLectura("El archivo parece estar vacío o no contiene encabezados legibles.");
+        setErrorLectura("El archivo parece estar vacío o no tiene encabezados legibles.");
         return;
       }
       if (filas.length === 0) {
-        setErrorLectura("El archivo contiene encabezados pero no tiene filas de datos.");
+        setErrorLectura("El archivo tiene encabezados pero no tiene filas con datos.");
         return;
       }
 
@@ -80,11 +84,9 @@ export function ImportarPage() {
       const mapeoInicial = detectarMapeoColumnas(headersLeidos);
       setMapeo(mapeoInicial);
       setPaso("mapear");
-    } catch (err) {
+    } catch {
       setErrorLectura(
-        err instanceof Error
-          ? err.message
-          : "Error al procesar el archivo. Asegúrate de que sea un .xlsx o .csv válido.",
+        "No pudimos leer el archivo. Verifique que sea un archivo de Excel (.xlsx) o CSV (.csv) y que no esté dañado.",
       );
     } finally {
       setLeyendo(false);
@@ -101,15 +103,15 @@ export function ImportarPage() {
 
   function handleContinuarAPrevisualizar(): void {
     if (mapeo.cliente === null) {
-      setErrorLectura("Debes asignar una columna al campo 'Cliente'.");
+      setErrorLectura("Debe asignar una columna al campo «Cliente».");
       return;
     }
     if (mapeo.numeroPoliza === null) {
-      setErrorLectura("Debes asignar una columna al campo 'Número de póliza'.");
+      setErrorLectura("Debe asignar una columna al campo «Número de póliza».");
       return;
     }
     if (mapeo.vigenciaTexto === null) {
-      setErrorLectura("Debes asignar una columna al campo 'Vigencia'.");
+      setErrorLectura("Debe asignar una columna al campo «Vigencia».");
       return;
     }
 
@@ -153,11 +155,9 @@ export function ImportarPage() {
 
       setPolizasImportadas(importadas);
       setPaso("resultado");
-    } catch (err) {
+    } catch {
       setErrorImportacion(
-        err instanceof Error
-          ? err.message
-          : "Ocurrió un error al guardar los datos en la base de datos.",
+        "No se pudieron guardar los datos. Revise su conexión a internet e intente de nuevo.",
       );
     } finally {
       setImportando(false);
@@ -176,57 +176,33 @@ export function ImportarPage() {
   }
 
   return (
-    <section style={{ maxWidth: "880px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ margin: 0, fontSize: "28px" }}>Importación masiva desde Excel</h1>
-        <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
-          Carga en bloque tu cartera de clientes y pólizas a partir de un archivo .xlsx o .csv.
+    <section className="mx-auto w-full max-w-4xl">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Importar desde Excel</h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+          Cargue de una sola vez su cartera de clientes y pólizas a partir de un archivo .xlsx o .csv.
         </p>
       </div>
 
-      {/* Indicador de pasos */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: "28px",
-          paddingBottom: "16px",
-          borderBottom: "1px solid #e5e4e7",
-          fontSize: "14px",
-        }}
-      >
+      <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
         <Badge variant={paso === "subir" ? "default" : "secondary"}>1. Archivo</Badge>
-        <span style={{ color: "#9ca3af" }}>→</span>
-        <Badge variant={paso === "mapear" ? "default" : "secondary"}>2. Mapeo</Badge>
-        <span style={{ color: "#9ca3af" }}>→</span>
+        <span className="text-base text-muted-foreground">→</span>
+        <Badge variant={paso === "mapear" ? "default" : "secondary"}>2. Columnas</Badge>
+        <span className="text-base text-muted-foreground">→</span>
         <Badge variant={paso === "previsualizar" ? "default" : "secondary"}>
-          3. Previsualización
+          3. Revisión
         </Badge>
-        <span style={{ color: "#9ca3af" }}>→</span>
+        <span className="text-base text-muted-foreground">→</span>
         <Badge variant={paso === "resultado" ? "default" : "secondary"}>4. Resumen</Badge>
       </div>
 
-      {/* PASO 1: SUBIR ARCHIVO */}
       {paso === "subir" ? (
-        <div
-          style={{
-            border: "2px dashed #d1d5db",
-            borderRadius: "12px",
-            padding: "48px 24px",
-            textAlign: "center",
-            background: "#fafafa",
-          }}
-        >
-          <FileSpreadsheet
-            style={{ width: "56px", height: "56px", margin: "0 auto 16px", color: "#4f46e5" }}
-            aria-hidden="true"
-          />
-          <h2 style={{ margin: "0 0 8px", fontSize: "20px" }}>Selecciona tu archivo de pólizas</h2>
-          <p style={{ margin: "0 auto 24px", color: "#6b7280", maxWidth: "480px", fontSize: "15px" }}>
-            Formatos compatibles: <strong>.xlsx</strong> y <strong>.csv</strong>. El archivo debe
-            contener una fila por cada póliza (un cliente puede repetirse en varias filas).
+        <div className="mt-6 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-10 text-center sm:px-6 sm:py-12">
+          <FileSpreadsheet className="mx-auto mb-4 size-14 text-primary" aria-hidden="true" />
+          <h2 className="text-2xl font-semibold text-foreground">Seleccione su archivo de pólizas</h2>
+          <p className="mx-auto mt-2 mb-6 max-w-lg text-base text-muted-foreground">
+            Formatos aceptados: <strong>.xlsx</strong> y <strong>.csv</strong>. Cada fila debe ser una
+            póliza; un mismo cliente puede aparecer en varias filas.
           </p>
 
           <input
@@ -235,71 +211,45 @@ export function ImportarPage() {
             type="file"
             accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
             onChange={(e) => void handleArchivoSeleccionado(e)}
-            style={{ display: "none" }}
+            className="hidden"
           />
 
           <Button
             size="lg"
             disabled={leyendo}
             onClick={() => inputRef.current?.click()}
-            style={{ fontSize: "16px", padding: "12px 24px" }}
+            className="w-full sm:w-auto"
           >
             <Upload aria-hidden="true" />
-            {leyendo ? "Leyendo archivo…" : "Seleccionar archivo Excel"}
+            {leyendo ? "Leyendo el archivo…" : "Seleccionar archivo"}
           </Button>
 
-          {errorLectura ? (
-            <p role="alert" style={{ color: "#b00020", marginTop: "16px" }}>
-              {errorLectura}
-            </p>
-          ) : null}
+          {errorLectura ? <MensajeError className="mt-6 text-left">{errorLectura}</MensajeError> : null}
 
-          <div
-            style={{
-              marginTop: "32px",
-              padding: "16px",
-              borderRadius: "8px",
-              background: "#f3f4f6",
-              textAlign: "left",
-              fontSize: "13px",
-              color: "#4b5563",
-            }}
-          >
-            <p style={{ margin: "0 0 6px", fontWeight: "bold" }}>Columnas habituales esperadas:</p>
-            <p style={{ margin: 0 }}>
-              CLIENTE · COMPAÑIA DE SEGUROS · TIPO DE PRODUCTO · NUMERO DE POLIZA · VIGENCIA (ej.
+          <div className="mt-8 rounded-lg bg-muted px-4 py-4 text-left">
+            <p className="text-base font-semibold text-foreground">Columnas que suele tener el archivo</p>
+            <p className="mt-1 text-base break-words text-foreground">
+              CLIENTE · COMPAÑÍA DE SEGUROS · TIPO DE PRODUCTO · NÚMERO DE PÓLIZA · VIGENCIA (por ejemplo
               16/9/2026 al 16/09/2027) · PRIMA · OBSERVACIONES
             </p>
           </div>
         </div>
       ) : null}
 
-      {/* PASO 2: MAPEO DE COLUMNAS */}
       {paso === "mapear" ? (
-        <div style={{ display: "grid", gap: "20px" }}>
-          <div
-            style={{
-              border: "1px solid #e5e4e7",
-              borderRadius: "8px",
-              padding: "16px",
-              background: "#f9fafb",
-            }}
-          >
-            <p style={{ margin: 0, fontWeight: 600 }}>Archivo: {archivo?.name}</p>
-            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}>
-              Se detectaron <strong>{headers.length}</strong> columnas y{" "}
-              <strong>{filasRaw.length}</strong> filas de datos. Asigna cada campo del sistema a la
-              columna correspondiente.
+        <div className="mt-6 flex flex-col gap-5">
+          <div className="rounded-xl border border-border bg-muted/30 p-4">
+            <p className="text-base font-semibold text-foreground">Archivo: {archivo?.name}</p>
+            <p className="mt-1 text-base text-muted-foreground">
+              El archivo tiene <strong>{headers.length}</strong> columnas y{" "}
+              <strong>{filasRaw.length}</strong> filas. Indique qué columna corresponde a cada dato del
+              sistema.
             </p>
           </div>
 
-          {errorLectura ? (
-            <p role="alert" style={{ color: "#b00020", margin: 0 }}>
-              {errorLectura}
-            </p>
-          ) : null}
+          {errorLectura ? <MensajeError>{errorLectura}</MensajeError> : null}
 
-          <div style={{ display: "grid", gap: "12px" }}>
+          <div className="flex flex-col gap-3">
             {CAMPOS_SISTEMA.map((campo) => {
               const valorActual = mapeo[campo.clave];
               const ejemploDato =
@@ -308,57 +258,42 @@ export function ImportarPage() {
               return (
                 <div
                   key={campo.clave}
-                  style={{
-                    border: "1px solid #e5e4e7",
-                    borderRadius: "8px",
-                    padding: "14px 16px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "16px",
-                    flexWrap: "wrap",
-                  }}
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div style={{ minWidth: "220px", flex: 1 }}>
-                    <p style={{ margin: 0, fontWeight: 600, fontSize: "15px" }}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold text-foreground">
                       {campo.etiqueta}{" "}
                       {campo.requerido ? (
-                        <span style={{ color: "#b00020" }} title="Campo obligatorio">
+                        <span className="text-destructive" title="Dato obligatorio">
                           *
                         </span>
                       ) : null}
                     </p>
-                    <p style={{ margin: "2px 0 0", color: "#6b7280", fontSize: "13px" }}>
-                      {campo.descripcion}
-                    </p>
+                    <p className="mt-1 text-base text-muted-foreground">{campo.descripcion}</p>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "260px" }}>
+                  <div className="flex w-full flex-col gap-2 sm:w-80 sm:shrink-0">
                     <select
+                      aria-label={`Columna para ${campo.etiqueta}`}
                       value={valorActual === null ? -1 : valorActual}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
                         handleCambioMapeo(campo.clave, val === -1 ? null : val);
                       }}
-                      style={{
-                        fontSize: "15px",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid #d1d5db",
-                        background: "#fff",
-                      }}
+                      className={claseCampo}
                     >
-                      <option value={-1}>-- No asignar --</option>
+                      <option value={-1}>-- Sin asignar --</option>
                       {headers.map((h, idx) => (
                         <option key={idx} value={idx}>
-                          Columna {idx + 1}: {h || `(Sin título ${idx + 1})`}
+                          Columna {idx + 1}: {h || `(sin título ${idx + 1})`}
                         </option>
                       ))}
                     </select>
 
                     {ejemploDato ? (
-                      <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                        Ej. fila 1: &ldquo;{ejemploDato.length > 40 ? `${ejemploDato.substring(0, 40)}…` : ejemploDato}&rdquo;
+                      <span className="text-base break-words text-muted-foreground">
+                        Ejemplo: &ldquo;
+                        {ejemploDato.length > 40 ? `${ejemploDato.substring(0, 40)}…` : ejemploDato}&rdquo;
                       </span>
                     ) : null}
                   </div>
@@ -367,142 +302,86 @@ export function ImportarPage() {
             })}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", gap: "12px", flexWrap: "wrap" }}>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
             <Button variant="outline" onClick={handleReiniciar}>
               <ArrowLeft aria-hidden="true" />
-              Cambiar archivo
+              Cambiar de archivo
             </Button>
             <Button onClick={handleContinuarAPrevisualizar}>
-              Continuar a previsualización
+              Continuar
               <ArrowRight aria-hidden="true" />
             </Button>
           </div>
         </div>
       ) : null}
 
-      {/* PASO 3: PREVISUALIZACIÓN */}
       {paso === "previsualizar" && resultado ? (
-        <div style={{ display: "grid", gap: "24px" }}>
-          {/* Métricas clave */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "12px",
-            }}
-          >
-            <div
-              style={{
-                border: "1px solid #e5e4e7",
-                borderRadius: "8px",
-                padding: "16px",
-                background: "#f0fdf4",
-              }}
-            >
-              <p style={{ margin: 0, color: "#166534", fontSize: "13px", fontWeight: 600 }}>
-                PÓLIZAS VÁLIDAS
-              </p>
-              <p style={{ margin: "4px 0 0", fontSize: "28px", fontWeight: "bold", color: "#15803d" }}>
-                {resultado.filasValidas.length}
-              </p>
+        <div className="mt-6 flex flex-col gap-6">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-base font-semibold text-emerald-800">PÓLIZAS LISTAS</p>
+              <p className="mt-1 text-3xl font-bold text-emerald-700">{resultado.filasValidas.length}</p>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-base font-semibold text-blue-800">CLIENTES A CREAR</p>
+              <p className="mt-1 text-3xl font-bold text-blue-700">{resultado.clientesAgrupados.length}</p>
             </div>
 
             <div
-              style={{
-                border: "1px solid #e5e4e7",
-                borderRadius: "8px",
-                padding: "16px",
-                background: "#eff6ff",
-              }}
-            >
-              <p style={{ margin: 0, color: "#1e40af", fontSize: "13px", fontWeight: 600 }}>
-                CLIENTES A CREAR
-              </p>
-              <p style={{ margin: "4px 0 0", fontSize: "28px", fontWeight: "bold", color: "#1d4ed8" }}>
-                {resultado.clientesAgrupados.length}
-              </p>
-            </div>
-
-            <div
-              style={{
-                border: "1px solid #e5e4e7",
-                borderRadius: "8px",
-                padding: "16px",
-                background: resultado.errores.length > 0 ? "#fef2f2" : "#f9fafb",
-              }}
+              className={
+                resultado.errores.length > 0
+                  ? "rounded-xl border border-red-200 bg-red-50 p-4"
+                  : "rounded-xl border border-border bg-muted/30 p-4"
+              }
             >
               <p
-                style={{
-                  margin: 0,
-                  color: resultado.errores.length > 0 ? "#991b1b" : "#6b7280",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                }}
+                className={
+                  resultado.errores.length > 0
+                    ? "text-base font-semibold text-red-800"
+                    : "text-base font-semibold text-muted-foreground"
+                }
               >
                 FILAS CON ERROR
               </p>
               <p
-                style={{
-                  margin: "4px 0 0",
-                  fontSize: "28px",
-                  fontWeight: "bold",
-                  color: resultado.errores.length > 0 ? "#b91c1c" : "#374151",
-                }}
+                className={
+                  resultado.errores.length > 0
+                    ? "mt-1 text-3xl font-bold text-red-700"
+                    : "mt-1 text-3xl font-bold text-foreground"
+                }
               >
                 {resultado.errores.length}
               </p>
             </div>
           </div>
 
-          {errorImportacion ? (
-            <p role="alert" style={{ color: "#b00020", margin: 0 }}>
-              {errorImportacion}
-            </p>
-          ) : null}
+          {errorImportacion ? <MensajeError>{errorImportacion}</MensajeError> : null}
 
-          {/* Listado de filas con error */}
           {resultado.errores.length > 0 ? (
-            <div
-              style={{
-                border: "1px solid #fecaca",
-                borderRadius: "8px",
-                padding: "16px",
-                background: "#fff5f5",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                <AlertCircle style={{ color: "#dc2626", width: "20px", height: "20px" }} aria-hidden="true" />
-                <h3 style={{ margin: 0, fontSize: "16px", color: "#991b1b" }}>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="size-6 shrink-0 text-red-600" aria-hidden="true" />
+                <h3 className="text-lg font-semibold text-red-800">
                   Filas que no se importarán ({resultado.errores.length})
                 </h3>
               </div>
-              <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#7f1d1d" }}>
-                Estas filas tienen datos faltantes o con formato incorrecto y serán ignoradas sin
-                afectar la importación de las filas válidas:
+              <p className="mt-2 text-base text-red-800">
+                Estas filas tienen datos faltantes o mal escritos. Se omitirán sin afectar al resto de
+                la importación:
               </p>
 
-              <div style={{ display: "grid", gap: "8px", maxHeight: "240px", overflowY: "auto" }}>
+              <div className="mt-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
                 {resultado.errores.map((err, idx) => (
                   <div
                     key={idx}
-                    style={{
-                      border: "1px solid #fee2e2",
-                      borderRadius: "6px",
-                      padding: "8px 12px",
-                      background: "#fff",
-                      fontSize: "13px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: "8px",
-                      flexWrap: "wrap",
-                    }}
+                    className="flex flex-col gap-1 rounded-lg border border-red-200 bg-background px-3 py-2 text-base sm:flex-row sm:justify-between sm:gap-3"
                   >
-                    <div>
-                      <strong>Fila {err.filaNumero}:</strong>{" "}
-                      <span style={{ color: "#b91c1c" }}>{err.motivo}</span>
-                    </div>
+                    <span className="text-foreground">
+                      <strong>Fila {err.filaNumero}:</strong> <span className="text-red-700">{err.motivo}</span>
+                    </span>
                     {err.datosFila ? (
-                      <span style={{ color: "#6b7280" }}>
+                      <span className="break-words text-muted-foreground">
                         Cliente: &ldquo;{err.datosFila.cliente}&rdquo; · Póliza: &ldquo;
                         {err.datosFila.numeroPoliza}&rdquo;
                       </span>
@@ -513,52 +392,38 @@ export function ImportarPage() {
             </div>
           ) : null}
 
-          {/* Agrupación de clientes y pólizas a importar */}
           <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: "18px" }}>
-              Clientes y pólizas a crear ({resultado.clientesAgrupados.length} clientes)
+            <h3 className="text-xl font-semibold text-foreground">
+              Clientes y pólizas a crear ({resultado.clientesAgrupados.length}{" "}
+              {resultado.clientesAgrupados.length === 1 ? "cliente" : "clientes"})
             </h3>
 
             {resultado.clientesAgrupados.length === 0 ? (
-              <p style={{ color: "#6b7280" }}>No se encontraron filas válidas para importar.</p>
+              <p className="mt-3 text-base text-muted-foreground">
+                No se encontraron filas completas para importar.
+              </p>
             ) : (
-              <div style={{ display: "grid", gap: "12px", maxHeight: "360px", overflowY: "auto" }}>
+              <div className="mt-3 flex max-h-96 flex-col gap-3 overflow-y-auto">
                 {resultado.clientesAgrupados.map((grupo, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      border: "1px solid #e5e4e7",
-                      borderRadius: "8px",
-                      padding: "14px 16px",
-                      background: "#fff",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <Users aria-hidden="true" style={{ width: "18px", height: "18px", color: "#4f46e5" }} />
-                        <h4 style={{ margin: 0, fontSize: "16px" }}>{grupo.nombre}</h4>
+                  <div key={idx} className="rounded-xl border border-border bg-card p-4 break-words">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Users className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                        <h4 className="text-lg font-semibold break-words text-foreground">{grupo.nombre}</h4>
                       </div>
                       <Badge variant="secondary">
                         {grupo.polizas.length} {grupo.polizas.length === 1 ? "póliza" : "pólizas"}
                       </Badge>
                     </div>
 
-                    <ul style={{ margin: "8px 0 0", paddingLeft: "20px", fontSize: "14px" }}>
+                    <ul className="mt-2 flex list-disc flex-col gap-1 pl-6 text-base text-foreground">
                       {grupo.polizas.map((p, pIdx) => (
-                        <li key={pIdx} style={{ margin: "3px 0" }}>
+                        <li key={pIdx}>
                           <strong>{p.aseguradora || "Sin aseguradora"}</strong> · Póliza:{" "}
                           <strong>{p.numeroPoliza}</strong>
                           {p.tipoProductoTexto ? ` (${p.tipoProductoTexto})` : ""} · Vigencia:{" "}
                           {p.vigenciaInicio} al {p.vigenciaFin}
-                          {p.prima > 0 ? ` · Prima: $${p.prima}` : ""}
+                          {p.prima > 0 ? ` · Prima: ${p.prima}` : ""}
                         </li>
                       ))}
                     </ul>
@@ -568,77 +433,46 @@ export function ImportarPage() {
             )}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", gap: "12px", flexWrap: "wrap" }}>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
             <Button variant="outline" disabled={importando} onClick={() => setPaso("mapear")}>
               <ArrowLeft aria-hidden="true" />
-              Modificar mapeo
+              Cambiar columnas
             </Button>
             <Button
               disabled={resultado.filasValidas.length === 0 || importando}
               onClick={() => void handleConfirmarImportacion()}
-              style={{ padding: "10px 24px" }}
+              className="w-full sm:w-auto"
             >
               <ShieldCheck aria-hidden="true" />
               {importando
-                ? "Guardando en Firestore…"
+                ? "Guardando…"
                 : `Confirmar e importar ${resultado.filasValidas.length} pólizas`}
             </Button>
           </div>
         </div>
       ) : null}
 
-      {/* PASO 4: RESULTADO FINAL */}
       {paso === "resultado" && resultado ? (
-        <div
-          style={{
-            border: "1px solid #bbf7d0",
-            borderRadius: "12px",
-            padding: "36px 24px",
-            textAlign: "center",
-            background: "#f0fdf4",
-          }}
-        >
-          <CheckCircle2
-            style={{ width: "56px", height: "56px", margin: "0 auto 16px", color: "#16a34a" }}
-            aria-hidden="true"
-          />
-          <h2 style={{ margin: "0 0 8px", fontSize: "22px", color: "#15803d" }}>
-            Importación completada
-          </h2>
-          <p
-            style={{
-              margin: "0 auto 20px",
-              fontSize: "18px",
-              fontWeight: 600,
-              color: "#166534",
-            }}
-          >
+        <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-9 text-center sm:px-6">
+          <CheckCircle2 className="mx-auto mb-4 size-14 text-emerald-600" aria-hidden="true" />
+          <h2 className="text-2xl font-bold text-emerald-800">Importación completada</h2>
+          <p className="mt-2 text-xl font-semibold text-emerald-800">
             {polizasImportadas} pólizas importadas, {resultado.errores.length} con error
           </p>
 
-          <p style={{ margin: "0 auto 24px", color: "#4b5563", maxWidth: "520px", fontSize: "14px" }}>
-            Los clientes y pólizas se han creado en Firestore agrupados por nombre exacto de
-            cliente. Ya puedes verlos en tu lista de clientes y en las alertas de renovación.
+          <p className="mx-auto mt-4 max-w-xl text-base text-foreground">
+            Los clientes y las pólizas quedaron guardados y agrupados por el nombre del cliente. Ya
+            puede verlos en la lista de clientes y en las renovaciones.
           </p>
 
           {resultado.errores.length > 0 ? (
-            <div
-              style={{
-                margin: "24px auto",
-                textAlign: "left",
-                maxWidth: "600px",
-                border: "1px solid #fecaca",
-                borderRadius: "8px",
-                padding: "16px",
-                background: "#fff",
-              }}
-            >
-              <p style={{ margin: "0 0 8px", fontWeight: "bold", color: "#991b1b", fontSize: "14px" }}>
-                Detalle de errores ({resultado.errores.length}):
+            <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-red-200 bg-background p-4 text-left">
+              <p className="text-base font-semibold text-red-800">
+                Detalle de las filas omitidas ({resultado.errores.length}):
               </p>
-              <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#7f1d1d" }}>
+              <ul className="mt-2 flex list-disc flex-col gap-1 pl-6 text-base text-red-800">
                 {resultado.errores.map((err, idx) => (
-                  <li key={idx} style={{ margin: "4px 0" }}>
+                  <li key={idx}>
                     Fila {err.filaNumero}: {err.motivo}
                   </li>
                 ))}
@@ -646,18 +480,10 @@ export function ImportarPage() {
             </div>
           ) : null}
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-              marginTop: "24px",
-            }}
-          >
-            <Button onClick={() => navigate("/clientes")}>Ver lista de clientes</Button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Button onClick={() => navigate("/clientes")}>Ver la lista de clientes</Button>
             <Button variant="outline" onClick={() => navigate("/dashboard")}>
-              Ir al dashboard
+              Ir a renovaciones
             </Button>
             <Button variant="outline" onClick={handleReiniciar}>
               Importar otro archivo
