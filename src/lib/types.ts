@@ -11,6 +11,20 @@ export type TipoSeguro =
   | "Equipo Pesado"
   | "Otro";
 
+export const TIPOS_SEGURO: TipoSeguro[] = [
+  "Auto",
+  "Daños a Terceros",
+  "Incendio",
+  "Contenido",
+  "Vida",
+  "Accidentes Personales",
+  "Salud",
+  "Responsabilidad Civil",
+  "Fianza",
+  "Equipo Pesado",
+  "Otro",
+];
+
 export type TipoDocumento =
   | "cedula"
   | "licencia"
