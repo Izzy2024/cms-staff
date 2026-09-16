@@ -64,3 +64,19 @@ export interface DocumentoPoliza {
   urlStorage: string;
   fechaSubida: string;
 }
+
+export const TIPOS_DOCUMENTO: { value: TipoDocumento; label: string }[] = [
+  { value: "cedula", label: "Cédula" },
+  { value: "licencia", label: "Licencia" },
+  { value: "registroVehicular", label: "Registro vehicular" },
+  { value: "proforma", label: "Proforma" },
+  { value: "cotizacion", label: "Cotización" },
+  { value: "poliza", label: "Póliza" },
+  { value: "endoso", label: "Endoso" },
+  { value: "kyc", label: "KYC" },
+  { value: "otro", label: "Otro" },
+];
+
+export function etiquetaTipoDocumento(tipo: TipoDocumento): string {
+  return TIPOS_DOCUMENTO.find((t) => t.value === tipo)?.label ?? tipo;
+}

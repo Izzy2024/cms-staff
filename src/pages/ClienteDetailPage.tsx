@@ -13,6 +13,7 @@ import {
 import type { Cliente, Poliza } from "../lib/types.ts";
 import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
+import { DocumentosPoliza } from "../components/DocumentosPoliza.tsx";
 
 const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
 
@@ -141,7 +142,7 @@ export function ClienteDetailPage() {
         </button>
       </form>
 
-      {!esNuevo ? (
+      {!esNuevo && clienteId ? (
         <div style={{ marginTop: "32px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2>Pólizas</h2>
@@ -200,6 +201,7 @@ export function ClienteDetailPage() {
                     Eliminar
                   </button>
                 </div>
+                <DocumentosPoliza clienteId={clienteId} polizaId={p.id} />
               </div>
             ))}
           </div>
