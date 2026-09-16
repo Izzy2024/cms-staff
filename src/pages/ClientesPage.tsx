@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
+import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 
 function coincide(item: ClienteConPolizas, termino: string): boolean {
   const t = termino.trim().toLowerCase();
@@ -75,8 +76,13 @@ export function ClientesPage() {
               ) : (
                 <ul style={{ margin: "8px 0 0", paddingLeft: "20px" }}>
                   {polizas.map((p) => (
-                    <li key={p.id}>
-                      {p.aseguradora} · {p.tipoSeguro} · Póliza {p.numeroPoliza} (vence {p.vigenciaFin})
+                    <li key={p.id} style={{ margin: "4px 0" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span>
+                          {p.aseguradora} · {p.tipoSeguro} · Póliza {p.numeroPoliza} (vence {p.vigenciaFin})
+                        </span>
+                        <RenovacionBadge vigenciaFin={p.vigenciaFin} />
+                      </span>
                     </li>
                   ))}
                 </ul>

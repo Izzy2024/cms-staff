@@ -14,6 +14,7 @@ import type { Cliente, Poliza } from "../lib/types.ts";
 import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
 import { DocumentosPoliza } from "../components/DocumentosPoliza.tsx";
+import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 
 const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
 
@@ -182,8 +183,11 @@ export function ClienteDetailPage() {
                 </p>
                 <p style={{ margin: "4px 0" }}>Póliza: {p.numeroPoliza}</p>
                 {p.detalleBien ? <p style={{ margin: "4px 0" }}>{p.detalleBien}</p> : null}
-                <p style={{ margin: "4px 0" }}>
-                  Vigencia: {p.vigenciaInicio} a {p.vigenciaFin}
+                <p style={{ margin: "4px 0", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span>
+                    Vigencia: {p.vigenciaInicio} a {p.vigenciaFin}
+                  </span>
+                  <RenovacionBadge vigenciaFin={p.vigenciaFin} />
                 </p>
                 <p style={{ margin: "4px 0" }}>Prima: {p.prima}</p>
                 {p.observaciones ? <p style={{ margin: "4px 0" }}>{p.observaciones}</p> : null}
