@@ -156,6 +156,7 @@ export function ImportarPage() {
             vigenciaFin: p.vigenciaFin,
             prima: p.prima,
             observaciones: p.observaciones,
+            beneficios: "",
           });
           importadas++;
         }

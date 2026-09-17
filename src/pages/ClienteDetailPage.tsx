@@ -25,9 +25,13 @@ import {
   updateCliente,
   updatePoliza,
 } from "../lib/clientesRepo.ts";
-import type { Cliente, Poliza } from "../lib/types.ts";
+import { subirDocumento } from "../lib/documentosRepo.ts";
+import { TIPOS_SEGURO } from "../lib/types.ts";
+import type { Cliente, Poliza, TipoSeguro } from "../lib/types.ts";
+import type { ResultadoExtraccion } from "../lib/extraccionPoliza.ts";
 import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
+import { SubirPolizaIA } from "../components/SubirPolizaIA.tsx";
 import { DocumentosPoliza } from "../components/DocumentosPoliza.tsx";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -38,6 +42,24 @@ import { MensajeError } from "../components/MensajeError.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 
 const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
+
+function polizaExtraidaAFormulario(poliza: ResultadoExtraccion["poliza"]): PolizaFormValues {
+  const tipoSeguro = TIPOS_SEGURO.includes(poliza.tipoSeguro as TipoSeguro)
+    ? (poliza.tipoSeguro as TipoSeguro)
+    : "Otro";
+
+  return {
+    aseguradora: poliza.aseguradora,
+    tipoSeguro,
+    detalleBien: poliza.detalleBien,
+    numeroPoliza: poliza.numeroPoliza,
+    vigenciaInicio: poliza.vigenciaInicio,
+    vigenciaFin: poliza.vigenciaFin,
+    prima: poliza.prima,
+    observaciones: poliza.observaciones,
+    beneficios: poliza.beneficios,
+  };
+}
 
 export function ClienteDetailPage() {
   const { clienteId } = useParams<{ clienteId: string }>();
@@ -51,6 +73,8 @@ export function ClienteDetailPage() {
   const [guardando, setGuardando] = useState(false);
   const [mostrarFormPoliza, setMostrarFormPoliza] = useState(false);
   const [polizaEditando, setPolizaEditando] = useState<Poliza | null>(null);
+  const [extraccionPoliza, setExtraccionPoliza] = useState<PolizaFormValues | null>(null);
+  const [archivoPolizaExtraida, setArchivoPolizaExtraida] = useState<File | null>(null);
 
   useEffect(() => {
     if (esNuevo) return;
@@ -102,15 +126,45 @@ export function ClienteDetailPage() {
 
   async function handleGuardarPoliza(valores: PolizaFormValues): Promise<void> {
     if (!clienteId || esNuevo) return;
+    setError("");
     if (polizaEditando) {
       await updatePoliza(clienteId, polizaEditando.id, valores);
     } else {
-      await createPoliza(clienteId, valores);
+      const nuevaPolizaId = await createPoliza(clienteId, valores);
+      if (archivoPolizaExtraida) {
+        try {
+          await subirDocumento(clienteId, nuevaPolizaId, archivoPolizaExtraida, "poliza");
+        } catch {
+          setError(
+            "La póliza se guardó correctamente, pero no se pudo adjuntar el PDF. Puede subirlo de nuevo desde los documentos de la póliza.",
+          );
+        }
+      }
+      setExtraccionPoliza(null);
+      setArchivoPolizaExtraida(null);
     }
     const listaPolizas = await listPolizas(clienteId);
     setPolizas(listaPolizas);
     setMostrarFormPoliza(false);
     setPolizaEditando(null);
+  }
+
+  function handleExtraccionNuevoCliente(resultado: ResultadoExtraccion, archivo: File): void {
+    setDatos((previo) => ({
+      nombre: resultado.cliente.nombre.trim() ? resultado.cliente.nombre : previo.nombre,
+      cedula: resultado.cliente.cedula.trim() ? resultado.cliente.cedula : previo.cedula,
+      telefono: resultado.cliente.telefono.trim() ? resultado.cliente.telefono : previo.telefono,
+      email: resultado.cliente.email.trim() ? resultado.cliente.email : previo.email,
+    }));
+    setExtraccionPoliza(polizaExtraidaAFormulario(resultado.poliza));
+    setArchivoPolizaExtraida(archivo);
+  }
+
+  function handleExtraccionParaPoliza(resultado: ResultadoExtraccion, archivo: File): void {
+    setExtraccionPoliza(polizaExtraidaAFormulario(resultado.poliza));
+    setArchivoPolizaExtraida(archivo);
+    setPolizaEditando(null);
+    setMostrarFormPoliza(true);
   }
 
   async function handleEliminarPoliza(polizaId: string): Promise<void> {
@@ -161,6 +215,8 @@ export function ClienteDetailPage() {
       </div>
 
       {error ? <MensajeError>{error}</MensajeError> : null}
+
+      {esNuevo ? <SubirPolizaIA onExtraido={handleExtraccionNuevoCliente} /> : null}
 
       {/* Tarjeta de Datos del Cliente */}
       <form
@@ -269,10 +325,12 @@ export function ClienteDetailPage() {
             ) : null}
           </div>
 
+          <SubirPolizaIA onExtraido={handleExtraccionParaPoliza} />
+
           {mostrarFormPoliza ? (
             <div className="mt-2">
               <PolizaForm
-                inicial={polizaEditando ?? undefined}
+                inicial={polizaEditando ?? extraccionPoliza ?? undefined}
                 onGuardar={handleGuardarPoliza}
                 onCancelar={() => {
                   setMostrarFormPoliza(false);
@@ -371,6 +429,13 @@ export function ClienteDetailPage() {
                     <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
                       <span className="font-semibold text-muted-foreground">Observaciones: </span>
                       <span className="text-foreground">{p.observaciones}</span>
+                    </div>
+                  )}
+
+                  {p.beneficios && (
+                    <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
+                      <span className="font-semibold text-muted-foreground">Beneficios: </span>
+                      <span className="text-foreground">{p.beneficios}</span>
                     </div>
                   )}
                 </div>

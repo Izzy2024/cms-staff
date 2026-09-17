@@ -14,6 +14,7 @@ function filaAPoliza(fila: {
   vigencia_fin: string;
   prima: number;
   observaciones: string;
+  beneficios: string;
 }): Poliza {
   return {
     id: fila.id,
@@ -26,6 +27,7 @@ function filaAPoliza(fila: {
     vigenciaFin: fila.vigencia_fin,
     prima: fila.prima,
     observaciones: fila.observaciones,
+    beneficios: fila.beneficios,
   };
 }
 
@@ -39,6 +41,7 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
     vigencia_fin: data.vigenciaFin,
     prima: data.prima,
     observaciones: data.observaciones,
+    beneficios: data.beneficios,
   };
 }
 
