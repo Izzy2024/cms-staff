@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO, startOfDay } from "date-fns";
 import type { ClienteConPolizas } from "./clientesRepo.ts";
-import type { Poliza } from "./types.ts";
+import type { Cliente, Poliza } from "./types.ts";
 
 export interface ItemRenovacion {
   clienteId: string;
@@ -114,4 +114,35 @@ export function obtenerRenovacionesProximas(
   });
 
   return items;
+}
+
+/**
+ * Determina el estado activo/inactivo de un cliente según las fechas de sus pólizas.
+ * Si tiene al menos una póliza vigente (diasRestantes >= 0), está activo y diasRelevante
+ * es la vigencia más próxima a vencer. Si ninguna está vigente, no está activo y
+ * diasRelevante es la más recientemente vencida. null si no hay fechas válidas.
+ */
+export function estadoClientePorFechas(polizas: Poliza[]): { activo: boolean; diasRelevante: number | null } {
+  let mejorActiva: number | null = null;
+  let mejorVencida: number | null = null;
+  for (const p of polizas) {
+    const dias = calcularDiasRestantes(p.vigenciaFin);
+    if (dias === null) continue;
+    if (dias >= 0) {
+      if (mejorActiva === null || dias < mejorActiva) mejorActiva = dias;
+    } else {
+      if (mejorVencida === null || dias > mejorVencida) mejorVencida = dias;
+    }
+  }
+  if (mejorActiva !== null) return { activo: true, diasRelevante: mejorActiva };
+  return { activo: false, diasRelevante: mejorVencida };
+}
+
+/**
+ * Estado efectivo del cliente: si tiene un estado manual forzado (activoManual),
+ * ese manda; si está en automático (null/undefined), se calcula por fechas.
+ */
+export function esClienteActivo(cliente: Cliente, polizas: Poliza[]): boolean {
+  if (cliente.activoManual !== null && cliente.activoManual !== undefined) return cliente.activoManual;
+  return estadoClientePorFechas(polizas).activo;
 }
