@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
-import { LogIn } from "lucide-react";
+import { Lock, LogIn, Shield } from "lucide-react";
 import { auth } from "../lib/firebase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -37,8 +37,8 @@ export function LoginPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Cargando mensaje="Cargando…" />
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50/50">
+        <Cargando mensaje="Iniciando aplicación…" />
       </div>
     );
   }
@@ -67,54 +67,75 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-4 py-10">
-      <div className="rounded-xl border border-border bg-card p-6 shadow-xs sm:p-8">
-        <h1 className="text-3xl font-bold text-foreground">CMS Seguros</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Escriba su correo y contraseña para entrar.
+    <div className="flex min-h-screen w-full flex-col justify-center bg-zinc-50/60 px-4 py-12 dark:bg-background">
+      <div className="mx-auto w-full max-w-md">
+        <div className="text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
+            <Shield className="size-6" aria-hidden="true" />
+          </div>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-foreground">
+            CMS Seguros
+          </h1>
+          <p className="mt-1.5 text-base text-muted-foreground">
+            Portal de gestión de cartera y renovaciones
+          </p>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-border/80 bg-card p-6 shadow-xs sm:p-8">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4.5">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Correo electrónico</span>
+              <Input
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="agente@seguros.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Contraseña</span>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                required
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+
+            {error ? <MensajeError>{error}</MensajeError> : null}
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={submitting}
+              className="mt-2 w-full font-semibold shadow-xs"
+            >
+              <LogIn aria-hidden="true" />
+              {submitting ? "Iniciando sesión…" : "Ingresar"}
+            </Button>
+          </form>
+
+          <div className="mt-6 flex items-center justify-center gap-1.5 border-t border-border/60 pt-4 text-xs text-muted-foreground">
+            <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+            <span>Acceso seguro para agentes autorizados</span>
+          </div>
+        </div>
+
+        <p className="mt-5 text-center text-sm text-muted-foreground">
+          <Link
+            to="/dashboard"
+            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+          >
+            Ir al panel
+          </Link>{" "}
+          (requiere iniciar sesión)
         </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
-          <label className="flex flex-col gap-2 text-base font-medium text-foreground">
-            Correo electrónico
-            <Input
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-base font-medium text-foreground">
-            Contraseña
-            <Input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-
-          {error ? <MensajeError>{error}</MensajeError> : null}
-
-          <Button type="submit" size="lg" disabled={submitting} className="w-full">
-            <LogIn aria-hidden="true" />
-            {submitting ? "Ingresando…" : "Ingresar"}
-          </Button>
-        </form>
       </div>
-
-      <p className="mt-3 text-center text-base text-muted-foreground">
-        <Link
-          to="/dashboard"
-          className="inline-flex min-h-11 items-center px-2 font-medium text-foreground underline underline-offset-4"
-        >
-          Ir a renovaciones
-        </Link>{" "}
-        (requiere iniciar sesión)
-      </p>
     </div>
   );
 }

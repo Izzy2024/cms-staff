@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
-import { CalendarClock, LogOut, Menu, Upload, Users, X } from "lucide-react";
+import {
+  CalendarClock,
+  LogOut,
+  Menu,
+  Shield,
+  Upload,
+  User as UserIcon,
+  Users,
+  X,
+} from "lucide-react";
 import { auth } from "../lib/firebase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { Button } from "./ui/button.tsx";
@@ -15,10 +24,10 @@ const ENLACES = [
 
 function clasesEnlace(isActive: boolean, tamano: string): string {
   return cn(
-    "flex items-center gap-3 rounded-lg px-4 font-medium transition-colors",
+    "flex items-center gap-2.5 rounded-lg px-3.5 font-medium transition-all duration-150",
     tamano,
     isActive
-      ? "bg-muted text-foreground"
+      ? "bg-foreground text-background shadow-xs font-semibold"
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
@@ -38,33 +47,53 @@ export function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-20 border-b border-border bg-background">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-zinc-50/60 dark:bg-background">
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Link
             to="/dashboard"
             onClick={cerrarMenu}
-            className="inline-flex min-h-11 items-center text-xl font-bold text-foreground"
+            className="group inline-flex min-h-11 items-center gap-2.5 transition-transform active:scale-98"
           >
-            CMS Seguros
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-2xs transition-colors group-hover:bg-primary/90">
+              <Shield className="size-5" aria-hidden="true" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold tracking-tight text-foreground">
+                CMS Seguros
+              </span>
+            </div>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Navegación principal">
+          <nav className="hidden items-center gap-1.5 md:flex" aria-label="Navegación principal">
             {ENLACES.map(({ to, label, Icono }) => (
-              <NavLink key={to} to={to} className={({ isActive }) => clasesEnlace(isActive, "h-11 text-base")}>
-                <Icono className="size-5" aria-hidden="true" />
-                {label}
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => clasesEnlace(isActive, "h-10 text-base")}
+              >
+                <Icono className="size-4.5 shrink-0" aria-hidden="true" />
+                <span>{label}</span>
               </NavLink>
             ))}
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
             {user?.email ? (
-              <span className="hidden max-w-48 truncate text-base text-muted-foreground lg:inline" title={user.email}>
-                {user.email}
-              </span>
+              <div
+                className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/50 px-3 py-1 text-sm text-muted-foreground"
+                title={user.email}
+              >
+                <UserIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="max-w-40 truncate">{user.email}</span>
+              </div>
             ) : null}
-            <Button variant="outline" onClick={() => void handleLogout()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleLogout()}
+              className="text-muted-foreground hover:text-foreground"
+            >
               <LogOut aria-hidden="true" />
               Cerrar sesión
             </Button>
@@ -76,36 +105,39 @@ export function Layout() {
             aria-expanded={menuAbierto}
             aria-controls="menu-movil"
             aria-label={menuAbierto ? "Cerrar menú" : "Abrir menú"}
-            className="flex size-12 items-center justify-center rounded-lg border border-input text-foreground transition-colors hover:bg-muted md:hidden"
+            className="flex size-11 items-center justify-center rounded-lg border border-input bg-background text-foreground shadow-2xs transition-colors hover:bg-muted md:hidden"
           >
             {menuAbierto ? (
-              <X className="size-6" aria-hidden="true" />
+              <X className="size-5" aria-hidden="true" />
             ) : (
-              <Menu className="size-6" aria-hidden="true" />
+              <Menu className="size-5" aria-hidden="true" />
             )}
           </button>
         </div>
 
         {menuAbierto ? (
-          <div id="menu-movil" className="border-t border-border md:hidden">
-            <nav className="mx-auto flex w-full max-w-5xl flex-col gap-1 px-4 py-3" aria-label="Navegación principal">
+          <div id="menu-movil" className="border-t border-border bg-background px-4 py-3 md:hidden">
+            <nav className="flex flex-col gap-1.5" aria-label="Navegación principal">
               {ENLACES.map(({ to, label, Icono }) => (
                 <NavLink
                   key={to}
                   to={to}
                   onClick={cerrarMenu}
-                  className={({ isActive }) => clasesEnlace(isActive, "h-12 text-lg")}
+                  className={({ isActive }) => clasesEnlace(isActive, "h-12 text-base")}
                 >
                   <Icono className="size-5" aria-hidden="true" />
-                  {label}
+                  <span>{label}</span>
                 </NavLink>
               ))}
 
-              <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3">
+              <div className="mt-2 flex flex-col gap-3 border-t border-border/80 pt-3">
                 {user?.email ? (
-                  <span className="truncate px-4 text-base text-muted-foreground">{user.email}</span>
+                  <div className="flex items-center gap-2 px-3 text-sm text-muted-foreground">
+                    <UserIcon className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{user.email}</span>
+                  </div>
                 ) : null}
-                <Button variant="outline" className="w-full" onClick={() => void handleLogout()}>
+                <Button variant="outline" className="w-full justify-center" onClick={() => void handleLogout()}>
                   <LogOut aria-hidden="true" />
                   Cerrar sesión
                 </Button>
@@ -115,9 +147,13 @@ export function Layout() {
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />
       </main>
+
+      <footer className="border-t border-border/60 bg-background/50 py-4 text-center text-xs text-muted-foreground">
+        CMS Seguros · Sistema de Gestión de Cartera
+      </footer>
     </div>
   );
 }

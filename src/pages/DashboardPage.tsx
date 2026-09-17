@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, ChevronRight } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
 import { obtenerRenovacionesProximas, textoDiasRestantes } from "../lib/renovaciones.ts";
@@ -8,6 +17,9 @@ import type { ItemRenovacion } from "../lib/renovaciones.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Cargando } from "../components/Cargando.tsx";
 import { MensajeError } from "../components/MensajeError.tsx";
+import { EmptyState } from "../components/EmptyState.tsx";
+import { Button } from "../components/ui/button.tsx";
+import { Badge } from "../components/ui/badge.tsx";
 
 export function DashboardPage() {
   const [clientesConPolizas, setClientesConPolizas] = useState<ClienteConPolizas[]>([]);
@@ -17,7 +29,9 @@ export function DashboardPage() {
   useEffect(() => {
     listClientesConPolizas()
       .then(setClientesConPolizas)
-      .catch(() => setError("No se pudieron cargar las renovaciones. Revise su conexión e intente de nuevo."))
+      .catch(() =>
+        setError("No se pudieron cargar las renovaciones. Revise su conexión e intente de nuevo."),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -26,65 +40,124 @@ export function DashboardPage() {
   }, [clientesConPolizas]);
 
   return (
-    <section>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+    <section className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Renovaciones próximas</h1>
-          <p className="mt-1 text-lg text-muted-foreground">
-            Pólizas que vencen en los próximos 30 días, ordenadas por la fecha más próxima.
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Renovaciones próximas
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+            Pólizas con vencimiento en los próximos 30 días, ordenadas por urgencia.
           </p>
         </div>
+
         {!loading && !error && renovaciones.length > 0 ? (
-          <span className="shrink-0 text-base font-medium text-muted-foreground">
-            {renovaciones.length} {renovaciones.length === 1 ? "póliza" : "pólizas"}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge variant="warning" className="px-3 py-1 text-sm font-semibold">
+              <AlertTriangle className="size-3.5" aria-hidden="true" />
+              {renovaciones.length} {renovaciones.length === 1 ? "póliza por vencer" : "pólizas por vencer"}
+            </Badge>
+          </div>
         ) : null}
       </div>
 
       {loading ? <Cargando mensaje="Cargando renovaciones…" /> : null}
 
-      {error ? <MensajeError className="mt-6">{error}</MensajeError> : null}
+      {error ? <MensajeError>{error}</MensajeError> : null}
 
       {!loading && !error && renovaciones.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/40 px-6 py-12 text-center">
-          <CheckCircle2 className="mx-auto mb-3 size-12 text-emerald-600" aria-hidden="true" />
-          <h2 className="text-xl font-semibold text-foreground">No hay renovaciones próximas</h2>
-          <p className="mx-auto mt-2 max-w-md text-base text-muted-foreground">
-            Todas las pólizas registradas están al día. Ninguna vence en los próximos 30 días.
-          </p>
-        </div>
+        <EmptyState
+          icono={ShieldCheck}
+          titulo="Todo al día en la cartera"
+          descripcion="No hay pólizas que venzan en los próximos 30 días. Todas las coberturas registradas están vigentes."
+          accion={
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button nativeButton={false} render={<Link to="/clientes" />}>
+                <Users aria-hidden="true" />
+                Ver cartera de clientes
+              </Button>
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link to="/importar" />}
+              >
+                <FileSpreadsheet aria-hidden="true" />
+                Importar pólizas
+              </Button>
+            </div>
+          }
+        />
       ) : null}
 
       {!loading && !error && renovaciones.length > 0 ? (
-        <div className="mt-6 flex flex-col gap-3">
-          {renovaciones.map((item) => (
-            <Link key={`${item.clienteId}-${item.poliza.id}`} to={`/clientes/${item.clienteId}`} className="block">
-              <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                <div className="flex min-w-0 flex-1 flex-col gap-2 break-words">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-xl font-semibold text-foreground">{item.clienteNombre}</h2>
-                    <RenovacionBadge diasRestantes={item.diasRestantes} />
+        <div className="flex flex-col gap-3">
+          {renovaciones.map((item) => {
+            const esVencida = item.diasRestantes < 0;
+            const esUrgente = item.diasRestantes <= 7;
+
+            const acentoBorde = esVencida
+              ? "border-l-4 border-l-red-500"
+              : esUrgente
+              ? "border-l-4 border-l-amber-500"
+              : "border-l-4 border-l-blue-400";
+
+            return (
+              <Link
+                key={`${item.clienteId}-${item.poliza.id}`}
+                to={`/clientes/${item.clienteId}`}
+                className="group block"
+              >
+                <div
+                  className={`flex flex-col gap-3.5 rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-150 hover:border-foreground/25 hover:shadow-sm active:scale-[0.995] sm:flex-row sm:items-center sm:justify-between sm:gap-6 ${acentoBorde}`}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h2 className="text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
+                        {item.clienteNombre}
+                      </h2>
+                      <RenovacionBadge diasRestantes={item.diasRestantes} />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:text-base">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                        <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        {item.poliza.aseguradora}
+                      </span>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span>{item.poliza.tipoSeguro}</span>
+                      <span className="text-muted-foreground/60">•</span>
+                      <span className="inline-flex items-center gap-1 font-mono text-xs sm:text-sm text-foreground">
+                        <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        {item.poliza.numeroPoliza}
+                      </span>
+                    </div>
+
+                    {item.poliza.detalleBien ? (
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {item.poliza.detalleBien}
+                      </p>
+                    ) : null}
+
+                    <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                      <Calendar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span>
+                        Vence:{" "}
+                        <strong className="font-semibold text-foreground">
+                          {item.poliza.vigenciaFin}
+                        </strong>{" "}
+                        ({textoDiasRestantes(item.diasRestantes)})
+                      </span>
+                    </div>
                   </div>
 
-                  <p className="text-base text-foreground">
-                    <strong>{item.poliza.aseguradora}</strong> · {item.poliza.tipoSeguro} · Póliza:{" "}
-                    <strong>{item.poliza.numeroPoliza}</strong>
-                  </p>
-
-                  {item.poliza.detalleBien ? (
-                    <p className="text-base text-muted-foreground">{item.poliza.detalleBien}</p>
-                  ) : null}
-
-                  <p className="text-base text-muted-foreground">
-                    Vence: <strong className="text-foreground">{item.poliza.vigenciaFin}</strong> (
-                    {textoDiasRestantes(item.diasRestantes)})
-                  </p>
+                  <div className="flex shrink-0 items-center justify-end text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-foreground sm:pl-2">
+                    <ChevronRight className="size-5" aria-hidden="true" />
+                  </div>
                 </div>
-
-                <ChevronRight className="hidden size-6 shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       ) : null}
     </section>

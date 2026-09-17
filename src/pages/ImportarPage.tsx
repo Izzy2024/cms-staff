@@ -5,8 +5,11 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
   FileSpreadsheet,
+  HelpCircle,
+  RotateCcw,
   ShieldCheck,
   Upload,
   Users,
@@ -29,8 +32,15 @@ import type {
 
 type PasoImportacion = "subir" | "mapear" | "previsualizar" | "resultado";
 
-const claseCampo =
-  "h-11 w-full rounded-lg border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+const PASOS: { id: PasoImportacion; numero: number; titulo: string }[] = [
+  { id: "subir", numero: 1, titulo: "Archivo" },
+  { id: "mapear", numero: 2, titulo: "Columnas" },
+  { id: "previsualizar", numero: 3, titulo: "Revisión" },
+  { id: "resultado", numero: 4, titulo: "Resumen" },
+];
+
+const claseSelect =
+  "h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground shadow-2xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
 
 export function ImportarPage() {
   const navigate = useNavigate();
@@ -130,14 +140,12 @@ export function ImportarPage() {
 
     try {
       for (const grupo of resultado.clientesAgrupados) {
-        // 1. Crear el cliente con datos base (cédula y teléfono vacíos si no vienen en el Excel)
         const clienteId = await createCliente({
           nombre: grupo.nombre,
           cedula: "",
           telefono: "",
         });
 
-        // 2. Crear cada póliza del cliente
         for (const p of grupo.polizas) {
           await createPoliza(clienteId, {
             aseguradora: p.aseguradora,
@@ -175,81 +183,137 @@ export function ImportarPage() {
     setPolizasImportadas(0);
   }
 
+  const indexPasoActual = PASOS.findIndex((p) => p.id === paso);
+
   return (
-    <section className="mx-auto w-full max-w-4xl">
+    <section className="mx-auto w-full max-w-4xl space-y-8">
+      {/* Encabezado */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Importar desde Excel</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Cargue de una sola vez su cartera de clientes y pólizas a partir de un archivo .xlsx o .csv.
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Importar desde Excel</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cargue de una sola vez su cartera de clientes y pólizas a partir de una planilla .xlsx o .csv.
         </p>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
-        <Badge variant={paso === "subir" ? "default" : "secondary"}>1. Archivo</Badge>
-        <span className="text-base text-muted-foreground">→</span>
-        <Badge variant={paso === "mapear" ? "default" : "secondary"}>2. Columnas</Badge>
-        <span className="text-base text-muted-foreground">→</span>
-        <Badge variant={paso === "previsualizar" ? "default" : "secondary"}>
-          3. Revisión
-        </Badge>
-        <span className="text-base text-muted-foreground">→</span>
-        <Badge variant={paso === "resultado" ? "default" : "secondary"}>4. Resumen</Badge>
-      </div>
+      {/* Stepper visual moderno */}
+      <nav aria-label="Progreso de la importación" className="border-y border-border/60 py-4">
+        <ol className="grid grid-cols-4 gap-2 sm:gap-4">
+          {PASOS.map((item, idx) => {
+            const completado = idx < indexPasoActual;
+            const actual = idx === indexPasoActual;
 
+            return (
+              <li key={item.id} className="flex items-center gap-2 sm:gap-3">
+                <div
+                  className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors sm:size-8 ${
+                    actual
+                      ? "bg-foreground text-background"
+                      : completado
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {completado ? (
+                    <Check className="size-3.5 sm:size-4" aria-hidden="true" />
+                  ) : (
+                    item.numero
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <span
+                    className={`block truncate text-xs font-medium sm:text-sm ${
+                      actual
+                        ? "font-semibold text-foreground"
+                        : completado
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {item.titulo}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+
+      {/* Paso 1: Subir Archivo */}
       {paso === "subir" ? (
-        <div className="mt-6 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-10 text-center sm:px-6 sm:py-12">
-          <FileSpreadsheet className="mx-auto mb-4 size-14 text-primary" aria-hidden="true" />
-          <h2 className="text-2xl font-semibold text-foreground">Seleccione su archivo de pólizas</h2>
-          <p className="mx-auto mt-2 mb-6 max-w-lg text-base text-muted-foreground">
-            Formatos aceptados: <strong>.xlsx</strong> y <strong>.csv</strong>. Cada fila debe ser una
-            póliza; un mismo cliente puede aparecer en varias filas.
-          </p>
+        <div className="space-y-6">
+          <div className="rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:border-foreground/40 sm:p-12">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <FileSpreadsheet className="size-8" aria-hidden="true" />
+            </div>
 
-          <input
-            id={fileInputId}
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-            onChange={(e) => void handleArchivoSeleccionado(e)}
-            className="hidden"
-          />
+            <h2 className="mt-4 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              Seleccione su archivo de pólizas
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              Archivos compatibles: <strong className="text-foreground">.xlsx</strong> o{" "}
+              <strong className="text-foreground">.csv</strong>. Cada fila representa una póliza; un mismo
+              cliente puede figurar en múltiples registros.
+            </p>
 
-          <Button
-            size="lg"
-            disabled={leyendo}
-            onClick={() => inputRef.current?.click()}
-            className="w-full sm:w-auto"
-          >
-            <Upload aria-hidden="true" />
-            {leyendo ? "Leyendo el archivo…" : "Seleccionar archivo"}
-          </Button>
+            <input
+              id={fileInputId}
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              onChange={(e) => void handleArchivoSeleccionado(e)}
+              className="hidden"
+            />
 
-          {errorLectura ? <MensajeError className="mt-6 text-left">{errorLectura}</MensajeError> : null}
+            <div className="mt-6 flex justify-center">
+              <Button
+                size="lg"
+                disabled={leyendo}
+                onClick={() => inputRef.current?.click()}
+                className="w-full sm:w-auto"
+              >
+                <Upload className="size-4" aria-hidden="true" />
+                {leyendo ? "Leyendo archivo…" : "Seleccionar archivo"}
+              </Button>
+            </div>
 
-          <div className="mt-8 rounded-lg bg-muted px-4 py-4 text-left">
-            <p className="text-base font-semibold text-foreground">Columnas que suele tener el archivo</p>
-            <p className="mt-1 text-base break-words text-foreground">
-              CLIENTE · COMPAÑÍA DE SEGUROS · TIPO DE PRODUCTO · NÚMERO DE PÓLIZA · VIGENCIA (por ejemplo
-              16/9/2026 al 16/09/2027) · PRIMA · OBSERVACIONES
+            {errorLectura ? <MensajeError className="mt-6 text-left">{errorLectura}</MensajeError> : null}
+          </div>
+
+          {/* Tarjeta de referencia de columnas */}
+          <div className="rounded-xl border border-border/80 bg-muted/40 p-4 sm:p-5">
+            <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+              <HelpCircle className="size-4 text-primary" aria-hidden="true" />
+              Columnas habituales reconocidas automáticamente
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">
+              CLIENTE · COMPAÑÍA DE SEGUROS · TIPO DE PRODUCTO · NÚMERO DE PÓLIZA · VIGENCIA (ej.
+              16/09/2024 al 16/09/2025) · PRIMA · OBSERVACIONES
             </p>
           </div>
         </div>
       ) : null}
 
+      {/* Paso 2: Mapear Columnas */}
       {paso === "mapear" ? (
-        <div className="mt-6 flex flex-col gap-5">
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <p className="text-base font-semibold text-foreground">Archivo: {archivo?.name}</p>
-            <p className="mt-1 text-base text-muted-foreground">
-              El archivo tiene <strong>{headers.length}</strong> columnas y{" "}
-              <strong>{filasRaw.length}</strong> filas. Indique qué columna corresponde a cada dato del
-              sistema.
-            </p>
+        <div className="space-y-6">
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold tracking-tight text-foreground">
+                Archivo cargado: <span className="text-primary font-mono">{archivo?.name}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Detectamos <strong>{headers.length}</strong> columnas y <strong>{filasRaw.length}</strong>{" "}
+                filas con información.
+              </p>
+            </div>
+            <Badge variant="secondary" className="self-start text-xs font-mono sm:self-auto">
+              {filasRaw.length} filas
+            </Badge>
           </div>
 
           {errorLectura ? <MensajeError>{errorLectura}</MensajeError> : null}
 
-          <div className="flex flex-col gap-3">
+          <div className="space-y-3">
             {CAMPOS_SISTEMA.map((campo) => {
               const valorActual = mapeo[campo.clave];
               const ejemploDato =
@@ -258,21 +322,21 @@ export function ImportarPage() {
               return (
                 <div
                   key={campo.clave}
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold text-foreground">
+                    <p className="text-sm font-semibold text-foreground">
                       {campo.etiqueta}{" "}
                       {campo.requerido ? (
-                        <span className="text-destructive" title="Dato obligatorio">
+                        <span className="text-destructive font-bold" title="Campo obligatorio">
                           *
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-1 text-base text-muted-foreground">{campo.descripcion}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{campo.descripcion}</p>
                   </div>
 
-                  <div className="flex w-full flex-col gap-2 sm:w-80 sm:shrink-0">
+                  <div className="flex w-full flex-col gap-1.5 sm:w-80 sm:shrink-0">
                     <select
                       aria-label={`Columna para ${campo.etiqueta}`}
                       value={valorActual === null ? -1 : valorActual}
@@ -280,7 +344,7 @@ export function ImportarPage() {
                         const val = parseInt(e.target.value, 10);
                         handleCambioMapeo(campo.clave, val === -1 ? null : val);
                       }}
-                      className={claseCampo}
+                      className={claseSelect}
                     >
                       <option value={-1}>-- Sin asignar --</option>
                       {headers.map((h, idx) => (
@@ -291,9 +355,8 @@ export function ImportarPage() {
                     </select>
 
                     {ejemploDato ? (
-                      <span className="text-base break-words text-muted-foreground">
-                        Ejemplo: &ldquo;
-                        {ejemploDato.length > 40 ? `${ejemploDato.substring(0, 40)}…` : ejemploDato}&rdquo;
+                      <span className="truncate text-xs text-muted-foreground">
+                        Ejemplo fila 1: &ldquo;{ejemploDato}&rdquo;
                       </span>
                     ) : null}
                   </div>
@@ -302,54 +365,64 @@ export function ImportarPage() {
             })}
           </div>
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-4 sm:flex-row sm:justify-between">
             <Button variant="outline" onClick={handleReiniciar}>
-              <ArrowLeft aria-hidden="true" />
+              <ArrowLeft className="size-4" aria-hidden="true" />
               Cambiar de archivo
             </Button>
             <Button onClick={handleContinuarAPrevisualizar}>
-              Continuar
-              <ArrowRight aria-hidden="true" />
+              Continuar a revisión
+              <ArrowRight className="size-4" aria-hidden="true" />
             </Button>
           </div>
         </div>
       ) : null}
 
+      {/* Paso 3: Previsualización y Revisión */}
       {paso === "previsualizar" && resultado ? (
-        <div className="mt-6 flex flex-col gap-6">
+        <div className="space-y-6">
+          {/* Métricas KPI visuales */}
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-base font-semibold text-emerald-800">PÓLIZAS LISTAS</p>
-              <p className="mt-1 text-3xl font-bold text-emerald-700">{resultado.filasValidas.length}</p>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
+              <span className="text-xs font-semibold tracking-wider text-emerald-800 uppercase dark:text-emerald-300">
+                Pólizas listas
+              </span>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                {resultado.filasValidas.length}
+              </p>
             </div>
 
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-base font-semibold text-blue-800">CLIENTES A CREAR</p>
-              <p className="mt-1 text-3xl font-bold text-blue-700">{resultado.clientesAgrupados.length}</p>
+            <div className="rounded-xl border border-blue-500/20 bg-blue-50/50 p-4 dark:bg-blue-950/20">
+              <span className="text-xs font-semibold tracking-wider text-blue-800 uppercase dark:text-blue-300">
+                Clientes a crear
+              </span>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                {resultado.clientesAgrupados.length}
+              </p>
             </div>
 
             <div
-              className={
+              className={`rounded-xl border p-4 ${
                 resultado.errores.length > 0
-                  ? "rounded-xl border border-red-200 bg-red-50 p-4"
-                  : "rounded-xl border border-border bg-muted/30 p-4"
-              }
+                  ? "border-rose-500/20 bg-rose-50/50 dark:bg-rose-950/20"
+                  : "border-border bg-card"
+              }`}
             >
-              <p
-                className={
+              <span
+                className={`text-xs font-semibold tracking-wider uppercase ${
                   resultado.errores.length > 0
-                    ? "text-base font-semibold text-red-800"
-                    : "text-base font-semibold text-muted-foreground"
-                }
+                    ? "text-rose-800 dark:text-rose-300"
+                    : "text-muted-foreground"
+                }`}
               >
-                FILAS CON ERROR
-              </p>
+                Filas con error
+              </span>
               <p
-                className={
+                className={`mt-1 text-3xl font-bold tracking-tight ${
                   resultado.errores.length > 0
-                    ? "mt-1 text-3xl font-bold text-red-700"
-                    : "mt-1 text-3xl font-bold text-foreground"
-                }
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-foreground"
+                }`}
               >
                 {resultado.errores.length}
               </p>
@@ -358,30 +431,32 @@ export function ImportarPage() {
 
           {errorImportacion ? <MensajeError>{errorImportacion}</MensajeError> : null}
 
+          {/* Desglose de Errores */}
           {resultado.errores.length > 0 ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <div className="rounded-xl border border-rose-500/30 bg-rose-50/40 p-4 dark:bg-rose-950/20">
               <div className="flex items-center gap-2">
-                <AlertCircle className="size-6 shrink-0 text-red-600" aria-hidden="true" />
-                <h3 className="text-lg font-semibold text-red-800">
-                  Filas que no se importarán ({resultado.errores.length})
+                <AlertCircle className="size-5 shrink-0 text-rose-600" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                  Filas que se omitirán ({resultado.errores.length})
                 </h3>
               </div>
-              <p className="mt-2 text-base text-red-800">
-                Estas filas tienen datos faltantes o mal escritos. Se omitirán sin afectar al resto de
-                la importación:
+              <p className="mt-1 text-xs text-rose-800 dark:text-rose-300">
+                Estas filas tienen datos incompletos o fechas irreconocibles. Se descartarán sin
+                interrumpir la importación del resto:
               </p>
 
-              <div className="mt-3 flex max-h-60 flex-col gap-2 overflow-y-auto">
+              <div className="mt-3 flex max-h-56 flex-col gap-2 overflow-y-auto">
                 {resultado.errores.map((err, idx) => (
                   <div
                     key={idx}
-                    className="flex flex-col gap-1 rounded-lg border border-red-200 bg-background px-3 py-2 text-base sm:flex-row sm:justify-between sm:gap-3"
+                    className="flex flex-col gap-1 rounded-lg border border-rose-200/80 bg-background p-2.5 text-xs sm:flex-row sm:justify-between sm:gap-3"
                   >
                     <span className="text-foreground">
-                      <strong>Fila {err.filaNumero}:</strong> <span className="text-red-700">{err.motivo}</span>
+                      <strong>Fila {err.filaNumero}:</strong>{" "}
+                      <span className="text-rose-700">{err.motivo}</span>
                     </span>
                     {err.datosFila ? (
-                      <span className="break-words text-muted-foreground">
+                      <span className="truncate text-muted-foreground">
                         Cliente: &ldquo;{err.datosFila.cliente}&rdquo; · Póliza: &ldquo;
                         {err.datosFila.numeroPoliza}&rdquo;
                       </span>
@@ -392,38 +467,54 @@ export function ImportarPage() {
             </div>
           ) : null}
 
-          <div>
-            <h3 className="text-xl font-semibold text-foreground">
-              Clientes y pólizas a crear ({resultado.clientesAgrupados.length}{" "}
-              {resultado.clientesAgrupados.length === 1 ? "cliente" : "clientes"})
-            </h3>
+          {/* Lista previa de Clientes y Pólizas */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                Vista previa de clientes agrupados ({resultado.clientesAgrupados.length})
+              </h3>
+              <Badge variant="outline" className="text-xs">
+                {resultado.filasValidas.length} pólizas
+              </Badge>
+            </div>
 
             {resultado.clientesAgrupados.length === 0 ? (
-              <p className="mt-3 text-base text-muted-foreground">
-                No se encontraron filas completas para importar.
-              </p>
+              <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                No se encontraron filas con datos válidos para procesar.
+              </div>
             ) : (
-              <div className="mt-3 flex max-h-96 flex-col gap-3 overflow-y-auto">
+              <div className="flex max-h-96 flex-col gap-3 overflow-y-auto pr-1">
                 {resultado.clientesAgrupados.map((grupo, idx) => (
-                  <div key={idx} className="rounded-xl border border-border bg-card p-4 break-words">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Users className="size-5 shrink-0 text-primary" aria-hidden="true" />
-                        <h4 className="text-lg font-semibold break-words text-foreground">{grupo.nombre}</h4>
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-border bg-card p-4 shadow-2xs transition-colors"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Users className="size-4 text-primary" aria-hidden="true" />
+                        <h4 className="text-sm font-semibold tracking-tight text-foreground">
+                          {grupo.nombre}
+                        </h4>
                       </div>
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         {grupo.polizas.length} {grupo.polizas.length === 1 ? "póliza" : "pólizas"}
                       </Badge>
                     </div>
 
-                    <ul className="mt-2 flex list-disc flex-col gap-1 pl-6 text-base text-foreground">
+                    <ul className="mt-2.5 space-y-1.5 text-xs text-foreground sm:text-sm">
                       {grupo.polizas.map((p, pIdx) => (
-                        <li key={pIdx}>
-                          <strong>{p.aseguradora || "Sin aseguradora"}</strong> · Póliza:{" "}
-                          <strong>{p.numeroPoliza}</strong>
-                          {p.tipoProductoTexto ? ` (${p.tipoProductoTexto})` : ""} · Vigencia:{" "}
-                          {p.vigenciaInicio} al {p.vigenciaFin}
-                          {p.prima > 0 ? ` · Prima: ${p.prima}` : ""}
+                        <li
+                          key={pIdx}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-2.5 py-1.5"
+                        >
+                          <span className="font-medium">
+                            {p.aseguradora || "Sin aseguradora"} · {p.tipoProductoTexto || "Póliza"} ·{" "}
+                            <span className="font-mono text-muted-foreground">{p.numeroPoliza}</span>
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Vence: {p.vigenciaFin}
+                            {p.prima > 0 ? ` · $${p.prima}` : ""}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -433,44 +524,51 @@ export function ImportarPage() {
             )}
           </div>
 
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <div className="flex flex-col-reverse gap-3 border-t border-border/60 pt-4 sm:flex-row sm:justify-between">
             <Button variant="outline" disabled={importando} onClick={() => setPaso("mapear")}>
-              <ArrowLeft aria-hidden="true" />
-              Cambiar columnas
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Modificar columnas
             </Button>
             <Button
               disabled={resultado.filasValidas.length === 0 || importando}
               onClick={() => void handleConfirmarImportacion()}
               className="w-full sm:w-auto"
             >
-              <ShieldCheck aria-hidden="true" />
+              <ShieldCheck className="size-4" aria-hidden="true" />
               {importando
-                ? "Guardando…"
+                ? "Guardando en el sistema…"
                 : `Confirmar e importar ${resultado.filasValidas.length} pólizas`}
             </Button>
           </div>
         </div>
       ) : null}
 
+      {/* Paso 4: Resultado y Resumen */}
       {paso === "resultado" && resultado ? (
-        <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-9 text-center sm:px-6">
-          <CheckCircle2 className="mx-auto mb-4 size-14 text-emerald-600" aria-hidden="true" />
-          <h2 className="text-2xl font-bold text-emerald-800">Importación completada</h2>
-          <p className="mt-2 text-xl font-semibold text-emerald-800">
-            {polizasImportadas} pólizas importadas, {resultado.errores.length} con error
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-50/50 p-6 text-center dark:bg-emerald-950/20 sm:p-10">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="size-9" aria-hidden="true" />
+          </div>
+
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">
+            ¡Importación exitosa!
+          </h2>
+          <p className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-300">
+            {polizasImportadas} pólizas registradas · {resultado.clientesAgrupados.length} clientes
+            creados
           </p>
 
-          <p className="mx-auto mt-4 max-w-xl text-base text-foreground">
-            Los clientes y las pólizas quedaron guardados y agrupados por el nombre del cliente. Ya
-            puede verlos en la lista de clientes y en las renovaciones.
+          <p className="mx-auto mt-3 max-w-lg text-sm text-foreground/80">
+            Los clientes y sus respectivas pólizas fueron creados correctamente en el sistema. Ya
+            están disponibles en el directorio y sincronizados en las alertas de renovación.
           </p>
 
           {resultado.errores.length > 0 ? (
-            <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-red-200 bg-background p-4 text-left">
-              <p className="text-base font-semibold text-red-800">
-                Detalle de las filas omitidas ({resultado.errores.length}):
+            <div className="mx-auto mt-6 max-w-xl rounded-xl border border-rose-200 bg-background p-4 text-left">
+              <p className="text-xs font-semibold text-rose-800">
+                Detalle de filas omitidas ({resultado.errores.length}):
               </p>
-              <ul className="mt-2 flex list-disc flex-col gap-1 pl-6 text-base text-red-800">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700">
                 {resultado.errores.map((err, idx) => (
                   <li key={idx}>
                     Fila {err.filaNumero}: {err.motivo}
@@ -480,12 +578,13 @@ export function ImportarPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button onClick={() => navigate("/clientes")}>Ver la lista de clientes</Button>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button onClick={() => navigate("/clientes")}>Ver directorio de clientes</Button>
             <Button variant="outline" onClick={() => navigate("/dashboard")}>
               Ir a renovaciones
             </Button>
             <Button variant="outline" onClick={handleReiniciar}>
+              <RotateCcw className="size-4" aria-hidden="true" />
               Importar otro archivo
             </Button>
           </div>
@@ -494,3 +593,4 @@ export function ImportarPage() {
     </section>
   );
 }
+
