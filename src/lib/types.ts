@@ -55,6 +55,7 @@ export interface Poliza {
   vigenciaFin: string;
   prima: number;
   observaciones: string;
+  beneficios: string;
 }
 
 export interface DocumentoPoliza {

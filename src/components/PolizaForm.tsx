@@ -18,6 +18,7 @@ const vacio: PolizaFormValues = {
   vigenciaFin: "",
   prima: 0,
   observaciones: "",
+  beneficios: "",
 };
 
 const claseSelect =
@@ -176,6 +177,17 @@ export function PolizaForm({
             rows={3}
             className={claseTextarea}
             placeholder="Comentarios sobre coberturas, deducible o estatus especial…"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+          <span>Beneficios / coberturas</span>
+          <textarea
+            value={valores.beneficios}
+            onChange={(e) => setValores({ ...valores, beneficios: e.target.value })}
+            rows={3}
+            className={claseTextarea}
+            placeholder="Ej. Cobertura amplia, pérdida total, responsabilidad civil…"
           />
         </label>
       </div>
