@@ -69,6 +69,7 @@ export async function listClientesConPolizas(): Promise<ClienteConPolizas[]> {
       cedula: cliente.cedula,
       telefono: cliente.telefono,
       email: cliente.email ?? undefined,
+      activoManual: cliente.activo_manual ?? null,
     },
     polizas: polizasPorCliente.get(cliente.id) ?? [],
   }));
@@ -78,17 +79,38 @@ export async function getCliente(clienteId: string): Promise<Cliente | null> {
   const { data, error } = await supabase.from("clientes").select("*").eq("id", clienteId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { id: data.id, nombre: data.nombre, cedula: data.cedula, telefono: data.telefono, email: data.email ?? undefined };
+  return {
+    id: data.id,
+    nombre: data.nombre,
+    cedula: data.cedula,
+    telefono: data.telefono,
+    email: data.email ?? undefined,
+    activoManual: data.activo_manual ?? null,
+  };
 }
 
 export async function createCliente(data: Omit<Cliente, "id">): Promise<string> {
-  const { data: fila, error } = await supabase.from("clientes").insert(data).select("id").single();
+  const { activoManual, ...resto } = data;
+  const { data: fila, error } = await supabase
+    .from("clientes")
+    .insert({ ...resto, activo_manual: activoManual })
+    .select("id")
+    .single();
   if (error) throw error;
   return fila.id;
 }
 
 export async function updateCliente(clienteId: string, data: Omit<Cliente, "id">): Promise<void> {
-  const { error } = await supabase.from("clientes").update(data).eq("id", clienteId);
+  const { activoManual, ...resto } = data;
+  const { error } = await supabase
+    .from("clientes")
+    .update({ ...resto, activo_manual: activoManual })
+    .eq("id", clienteId);
+  if (error) throw error;
+}
+
+export async function actualizarEstadoManual(clienteId: string, activoManual: boolean | null): Promise<void> {
+  const { error } = await supabase.from("clientes").update({ activo_manual: activoManual }).eq("id", clienteId);
   if (error) throw error;
 }
 

@@ -42,6 +42,7 @@ export interface Cliente {
   cedula: string;
   telefono: string;
   email?: string;
+  activoManual?: boolean | null;
 }
 
 export interface Poliza {
