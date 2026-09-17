@@ -1,25 +1,40 @@
-import { collection, deleteDoc, doc, getDocs, setDoc } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { db, storage } from "./firebase.ts";
+import { supabase } from "./supabase.ts";
 import { validarArchivo } from "./documentosValidacion.ts";
 import type { DocumentoPoliza, TipoDocumento } from "./types.ts";
+
+const BUCKET = "documentos";
+const URL_FIRMADA_SEGUNDOS = 60 * 60;
 
 function nombreSeguro(nombre: string): string {
   return nombre
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9._-]+/g, "_");
 }
 
-function documentosCol(clienteId: string, polizaId: string) {
-  return collection(db, "clientes", clienteId, "polizas", polizaId, "documentos");
+async function urlFirmada(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, URL_FIRMADA_SEGUNDOS);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
-export async function listDocumentos(clienteId: string, polizaId: string): Promise<DocumentoPoliza[]> {
-  const snap = await getDocs(documentosCol(clienteId, polizaId));
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }) as DocumentoPoliza)
-    .sort((a, b) => b.fechaSubida.localeCompare(a.fechaSubida));
+export async function listDocumentos(_clienteId: string, polizaId: string): Promise<DocumentoPoliza[]> {
+  const { data, error } = await supabase
+    .from("documentos_poliza")
+    .select("*")
+    .eq("poliza_id", polizaId)
+    .order("fecha_subida", { ascending: false });
+  if (error) throw error;
+
+  return Promise.all(
+    (data ?? []).map(async (fila) => ({
+      id: fila.id,
+      nombreArchivo: fila.nombre_archivo,
+      tipoDocumento: fila.tipo_documento as TipoDocumento,
+      urlStorage: await urlFirmada(fila.storage_path),
+      fechaSubida: fila.fecha_subida,
+    })),
+  );
 }
 
 export async function subirDocumento(
@@ -31,36 +46,51 @@ export async function subirDocumento(
   const motivo = validarArchivo(archivo);
   if (motivo) throw new Error(motivo);
 
-  const docRef = doc(documentosCol(clienteId, polizaId));
-  const archivoRef = ref(
-    storage,
-    `clientes/${clienteId}/polizas/${polizaId}/${docRef.id}-${nombreSeguro(archivo.name)}`,
-  );
+  const path = `clientes/${clienteId}/polizas/${polizaId}/${crypto.randomUUID()}-${nombreSeguro(archivo.name)}`;
 
-  try {
-    await uploadBytes(archivoRef, archivo);
-    const urlStorage = await getDownloadURL(archivoRef);
-
-    const documento: Omit<DocumentoPoliza, "id"> = {
-      nombreArchivo: archivo.name,
-      tipoDocumento,
-      urlStorage,
-      fechaSubida: new Date().toISOString(),
-    };
-
-    await setDoc(docRef, documento);
-    return { id: docRef.id, ...documento };
-  } catch {
-    await deleteObject(archivoRef).catch(() => undefined);
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, archivo);
+  if (uploadError) {
     throw new Error("No se pudo subir el documento. Revise su conexión e intente de nuevo.");
   }
+
+  const { data: fila, error: insertError } = await supabase
+    .from("documentos_poliza")
+    .insert({
+      poliza_id: polizaId,
+      nombre_archivo: archivo.name,
+      tipo_documento: tipoDocumento,
+      storage_path: path,
+    })
+    .select("*")
+    .single();
+
+  if (insertError) {
+    await supabase.storage.from(BUCKET).remove([path]).catch(() => undefined);
+    throw new Error("No se pudo subir el documento. Revise su conexión e intente de nuevo.");
+  }
+
+  return {
+    id: fila.id,
+    nombreArchivo: fila.nombre_archivo,
+    tipoDocumento: fila.tipo_documento,
+    urlStorage: await urlFirmada(fila.storage_path),
+    fechaSubida: fila.fecha_subida,
+  };
 }
 
 export async function eliminarDocumento(
-  clienteId: string,
-  polizaId: string,
+  _clienteId: string,
+  _polizaId: string,
   documento: DocumentoPoliza,
 ): Promise<void> {
-  await deleteDoc(doc(db, "clientes", clienteId, "polizas", polizaId, "documentos", documento.id));
-  await deleteObject(ref(storage, documento.urlStorage)).catch(() => undefined);
+  const { data: fila } = await supabase
+    .from("documentos_poliza")
+    .select("storage_path")
+    .eq("id", documento.id)
+    .single();
+
+  await supabase.from("documentos_poliza").delete().eq("id", documento.id);
+  if (fila) {
+    await supabase.storage.from(BUCKET).remove([fila.storage_path]).catch(() => undefined);
+  }
 }

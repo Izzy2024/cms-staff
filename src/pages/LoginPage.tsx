@@ -1,25 +1,22 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
 import { Lock, LogIn, Shield } from "lucide-react";
-import { auth } from "../lib/firebase.ts";
+import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Input } from "../components/ui/input.tsx";
 import { Cargando } from "../components/Cargando.tsx";
 import { MensajeError } from "../components/MensajeError.tsx";
 
-function getErrorMessage(code: string): string {
+function getErrorMessage(code: string | undefined): string {
   switch (code) {
-    case "auth/invalid-credential":
-    case "auth/wrong-password":
-    case "auth/user-not-found":
+    case "invalid_credentials":
       return "El correo o la contraseña no son correctos.";
-    case "auth/invalid-email":
-      return "El correo electrónico no es válido.";
-    case "auth/too-many-requests":
+    case "email_not_confirmed":
+      return "Debe confirmar su correo antes de iniciar sesión.";
+    case "over_request_rate_limit":
+    case "over_email_send_rate_limit":
       return "Demasiados intentos seguidos. Espere unos minutos e intente de nuevo.";
     default:
       return "No se pudo iniciar sesión. Intente de nuevo.";
@@ -51,19 +48,18 @@ export function LoginPage() {
     event.preventDefault();
     setError("");
     setSubmitting(true);
-    try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
-      navigate(from, { replace: true });
-    } catch (err) {
-      if (err instanceof FirebaseError) {
-        setError(getErrorMessage(err.code));
-      } else {
-        setError("No se pudo iniciar sesión. Intente de nuevo.");
-      }
-    } finally {
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (signInError) {
+      setError(getErrorMessage(signInError.code));
       setSubmitting(false);
+      return;
     }
+    const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+    navigate(from, { replace: true });
+    setSubmitting(false);
   }
 
   return (

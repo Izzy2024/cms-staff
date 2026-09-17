@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { signOut } from "firebase/auth";
 import {
   CalendarClock,
   LogOut,
@@ -11,7 +10,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { auth } from "../lib/firebase.ts";
+import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { Button } from "./ui/button.tsx";
 import { cn } from "../lib/utils.ts";
@@ -38,7 +37,7 @@ export function Layout() {
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   async function handleLogout(): Promise<void> {
-    await signOut(auth);
+    await supabase.auth.signOut();
     navigate("/login", { replace: true });
   }
 

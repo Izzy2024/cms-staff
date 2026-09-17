@@ -1,69 +1,111 @@
-import {
-  addDoc,
-  collection,
-  collectionGroup,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "./firebase.ts";
+import { supabase } from "./supabase.ts";
 import type { Cliente, Poliza } from "./types.ts";
 
 export type ClienteConPolizas = { cliente: Cliente; polizas: Poliza[] };
 
-function polizasCol(clienteId: string) {
-  return collection(db, "clientes", clienteId, "polizas");
+function filaAPoliza(fila: {
+  id: string;
+  cliente_id: string;
+  aseguradora: string;
+  tipo_seguro: string;
+  detalle_bien: string;
+  numero_poliza: string;
+  vigencia_inicio: string;
+  vigencia_fin: string;
+  prima: number;
+  observaciones: string;
+}): Poliza {
+  return {
+    id: fila.id,
+    clienteId: fila.cliente_id,
+    aseguradora: fila.aseguradora,
+    tipoSeguro: fila.tipo_seguro as Poliza["tipoSeguro"],
+    detalleBien: fila.detalle_bien,
+    numeroPoliza: fila.numero_poliza,
+    vigenciaInicio: fila.vigencia_inicio,
+    vigenciaFin: fila.vigencia_fin,
+    prima: fila.prima,
+    observaciones: fila.observaciones,
+  };
+}
+
+function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
+  return {
+    aseguradora: data.aseguradora,
+    tipo_seguro: data.tipoSeguro,
+    detalle_bien: data.detalleBien,
+    numero_poliza: data.numeroPoliza,
+    vigencia_inicio: data.vigenciaInicio,
+    vigencia_fin: data.vigenciaFin,
+    prima: data.prima,
+    observaciones: data.observaciones,
+  };
 }
 
 export async function listClientesConPolizas(): Promise<ClienteConPolizas[]> {
-  const [clientesSnap, polizasSnap] = await Promise.all([
-    getDocs(collection(db, "clientes")),
-    getDocs(collectionGroup(db, "polizas")),
-  ]);
+  const [{ data: clientes, error: errorClientes }, { data: polizas, error: errorPolizas }] =
+    await Promise.all([
+      supabase.from("clientes").select("*"),
+      supabase.from("polizas").select("*"),
+    ]);
+  if (errorClientes) throw errorClientes;
+  if (errorPolizas) throw errorPolizas;
 
   const polizasPorCliente = new Map<string, Poliza[]>();
-  for (const polizaDoc of polizasSnap.docs) {
-    const clienteId = polizaDoc.ref.parent.parent?.id;
-    if (!clienteId) continue;
-    const poliza = { id: polizaDoc.id, clienteId, ...polizaDoc.data() } as Poliza;
-    const lista = polizasPorCliente.get(clienteId) ?? [];
+  for (const fila of polizas ?? []) {
+    const poliza = filaAPoliza(fila);
+    const lista = polizasPorCliente.get(poliza.clienteId) ?? [];
     lista.push(poliza);
-    polizasPorCliente.set(clienteId, lista);
+    polizasPorCliente.set(poliza.clienteId, lista);
   }
 
-  return clientesSnap.docs.map((clienteDoc) => ({
-    cliente: { id: clienteDoc.id, ...clienteDoc.data() } as Cliente,
-    polizas: polizasPorCliente.get(clienteDoc.id) ?? [],
+  return (clientes ?? []).map((cliente) => ({
+    cliente: {
+      id: cliente.id,
+      nombre: cliente.nombre,
+      cedula: cliente.cedula,
+      telefono: cliente.telefono,
+      email: cliente.email ?? undefined,
+    },
+    polizas: polizasPorCliente.get(cliente.id) ?? [],
   }));
 }
 
 export async function getCliente(clienteId: string): Promise<Cliente | null> {
-  const snap = await getDoc(doc(db, "clientes", clienteId));
-  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Cliente) : null;
+  const { data, error } = await supabase.from("clientes").select("*").eq("id", clienteId).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { id: data.id, nombre: data.nombre, cedula: data.cedula, telefono: data.telefono, email: data.email ?? undefined };
 }
 
 export async function createCliente(data: Omit<Cliente, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "clientes"), data);
-  return ref.id;
+  const { data: fila, error } = await supabase.from("clientes").insert(data).select("id").single();
+  if (error) throw error;
+  return fila.id;
 }
 
 export async function updateCliente(clienteId: string, data: Omit<Cliente, "id">): Promise<void> {
-  await updateDoc(doc(db, "clientes", clienteId), data);
+  const { error } = await supabase.from("clientes").update(data).eq("id", clienteId);
+  if (error) throw error;
 }
 
 export async function listPolizas(clienteId: string): Promise<Poliza[]> {
-  const snap = await getDocs(polizasCol(clienteId));
-  return snap.docs.map((d) => ({ id: d.id, clienteId, ...d.data() }) as Poliza);
+  const { data, error } = await supabase.from("polizas").select("*").eq("cliente_id", clienteId);
+  if (error) throw error;
+  return (data ?? []).map(filaAPoliza);
 }
 
 export async function createPoliza(
   clienteId: string,
   data: Omit<Poliza, "id" | "clienteId">,
 ): Promise<string> {
-  const ref = await addDoc(polizasCol(clienteId), data);
-  return ref.id;
+  const { data: fila, error } = await supabase
+    .from("polizas")
+    .insert({ ...polizaAFila(data), cliente_id: clienteId })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return fila.id;
 }
 
 export async function updatePoliza(
@@ -71,9 +113,15 @@ export async function updatePoliza(
   polizaId: string,
   data: Omit<Poliza, "id" | "clienteId">,
 ): Promise<void> {
-  await updateDoc(doc(db, "clientes", clienteId, "polizas", polizaId), data);
+  const { error } = await supabase
+    .from("polizas")
+    .update(polizaAFila(data))
+    .eq("id", polizaId)
+    .eq("cliente_id", clienteId);
+  if (error) throw error;
 }
 
 export async function deletePoliza(clienteId: string, polizaId: string): Promise<void> {
-  await deleteDoc(doc(db, "clientes", clienteId, "polizas", polizaId));
+  const { error } = await supabase.from("polizas").delete().eq("id", polizaId).eq("cliente_id", clienteId);
+  if (error) throw error;
 }
