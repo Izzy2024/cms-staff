@@ -1,32 +1,33 @@
-# React + TypeScript + Vite
+# CMS Seguros
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+CMS para gestión de clientes y pólizas de seguros, con extracción de datos desde PDF asistida por IA.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + TypeScript + Vite
+- Tailwind CSS + shadcn/ui
+- Supabase (base de datos y auth)
+- React Router, React Hook Form + Zod, TanStack Query
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+cp .env.example .env   # completar variables de entorno
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Scripts
+
+- `npm run dev` — servidor de desarrollo
+- `npm run build` — build de producción
+- `npm run lint` — lint con oxlint
+- `npm run preview` — preview del build
+
+## Estructura
+
+- `src/pages` — vistas (dashboard, clientes, importación, login)
+- `src/components` — componentes de UI
+- `src/auth` — autenticación
+- `src/lib` — utilidades y clientes (Supabase, etc.)
+- `supabase/` — migraciones y config de Supabase

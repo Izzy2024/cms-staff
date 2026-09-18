@@ -5,3 +5,7 @@ dist/
 .superpowers/
 .commandcode/
 .claude/
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
