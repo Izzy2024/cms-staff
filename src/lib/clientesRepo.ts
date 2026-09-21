@@ -69,6 +69,7 @@ export async function listClientesConPolizas(): Promise<ClienteConPolizas[]> {
       cedula: cliente.cedula,
       telefono: cliente.telefono,
       email: cliente.email ?? undefined,
+      fechaNacimiento: cliente.fecha_nacimiento ?? undefined,
       activoManual: cliente.activo_manual ?? null,
     },
     polizas: polizasPorCliente.get(cliente.id) ?? [],
@@ -85,15 +86,16 @@ export async function getCliente(clienteId: string): Promise<Cliente | null> {
     cedula: data.cedula,
     telefono: data.telefono,
     email: data.email ?? undefined,
+    fechaNacimiento: data.fecha_nacimiento ?? undefined,
     activoManual: data.activo_manual ?? null,
   };
 }
 
 export async function createCliente(data: Omit<Cliente, "id">): Promise<string> {
-  const { activoManual, ...resto } = data;
+  const { activoManual, fechaNacimiento, ...resto } = data;
   const { data: fila, error } = await supabase
     .from("clientes")
-    .insert({ ...resto, activo_manual: activoManual })
+    .insert({ ...resto, fecha_nacimiento: fechaNacimiento || null, activo_manual: activoManual })
     .select("id")
     .single();
   if (error) throw error;
@@ -101,10 +103,10 @@ export async function createCliente(data: Omit<Cliente, "id">): Promise<string> 
 }
 
 export async function updateCliente(clienteId: string, data: Omit<Cliente, "id">): Promise<void> {
-  const { activoManual, ...resto } = data;
+  const { activoManual, fechaNacimiento, ...resto } = data;
   const { error } = await supabase
     .from("clientes")
-    .update({ ...resto, activo_manual: activoManual })
+    .update({ ...resto, fecha_nacimiento: fechaNacimiento || null, activo_manual: activoManual })
     .eq("id", clienteId);
   if (error) throw error;
 }
