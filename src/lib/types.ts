@@ -9,6 +9,7 @@ export type TipoSeguro =
   | "Responsabilidad Civil"
   | "Fianza"
   | "Equipo Pesado"
+  | "Asistencia Viajera"
   | "Otro";
 
 export const TIPOS_SEGURO: TipoSeguro[] = [
@@ -22,8 +23,26 @@ export const TIPOS_SEGURO: TipoSeguro[] = [
   "Responsabilidad Civil",
   "Fianza",
   "Equipo Pesado",
+  "Asistencia Viajera",
   "Otro",
 ];
+
+export type CoberturaAuto = "Cobertura completa" | "Solo a terceros";
+export const COBERTURAS_AUTO: CoberturaAuto[] = [
+  "Cobertura completa",
+  "Solo a terceros",
+];
+
+export type FrecuenciaPago = "Anual" | "Semestral" | "Trimestral" | "Mensual";
+export const FRECUENCIAS_PAGO: FrecuenciaPago[] = [
+  "Anual",
+  "Semestral",
+  "Trimestral",
+  "Mensual",
+];
+
+export type ConductoPago = "Voluntaria" | "TCR" | "ACH";
+export const CONDUCTOS_PAGO: ConductoPago[] = ["Voluntaria", "TCR", "ACH"];
 
 export type TipoDocumento =
   | "cedula"
@@ -58,6 +77,11 @@ export interface Poliza {
   prima: number;
   observaciones: string;
   beneficios: string;
+  coberturaAuto?: CoberturaAuto;
+  frecuenciaPago?: FrecuenciaPago;
+  conductoPago?: ConductoPago;
+  diaPago?: string;
+  numeroCuotas?: number;
 }
 
 export interface DocumentoPoliza {

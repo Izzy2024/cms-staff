@@ -16,6 +16,7 @@ const TIPOS_SEGURO = [
   "Responsabilidad Civil",
   "Fianza",
   "Equipo Pesado",
+  "Asistencia Viajera",
   "Otro",
 ];
 
@@ -32,16 +33,26 @@ Responde SOLO con un objeto JSON estricto, sin prosa ni markdown, con esta forma
     "vigenciaFin": string,
     "prima": number,
     "observaciones": string,
-    "beneficios": string
+    "beneficios": string,
+    "coberturaAuto": string,
+    "frecuenciaPago": string,
+    "conductoPago": string,
+    "diaPago": string,
+    "numeroCuotas": number
   },
   "avisos": string[]
 }
 Reglas:
 - "tipoSeguro" debe ser EXACTAMENTE uno de: ${TIPOS_SEGURO.map((t) => `"${t}"`).join(", ")}. Si no hay certeza, usa "Otro".
+- "coberturaAuto": para seguros de auto, debe ser EXACTAMENTE uno de: "Cobertura completa", "Solo a terceros". Si la póliza es de Responsabilidad Civil, daños a terceros o seguro obligatorio, usa "Solo a terceros". Si es cobertura completa / comprensiva / colisión y vuelco, usa "Cobertura completa". Si no es auto o no se detecta, usa "" y agrégalo a "avisos".
+- "frecuenciaPago": debe ser EXACTAMENTE uno de: "Anual", "Semestral", "Trimestral", "Mensual". Si el documento indica "pagos mensuales", "mensual" o mensualidades (ej. "Dos (2) pagos mensuales"), usa "Mensual". Si indica semestral, "Semestral". Si indica trimestral, "Trimestral". Si es anual o pago único, "Anual". Si no se detecta, usa "" y agrégalo a "avisos".
+- "conductoPago": debe ser EXACTAMENTE uno de: "Voluntaria", "TCR", "ACH". Si en el documento indica "Descuento de tarjeta de credito", tarjeta de crédito o similar, mapear a "TCR". Si es débito bancario o ACH, mapear a "ACH". Si es pago directo, en ventanilla o voluntario, mapear a "Voluntaria". Si no se detecta, usa "" y agrégalo a "avisos".
+- "diaPago": texto libre con el día de pago o fecha estipulada (ej. "21 del mes correspondiente"). Si no se detecta, usa "" y agrégalo a "avisos".
+- "numeroCuotas": número entero de cuotas (mínimo 1). Si indica "Dos (2) pagos mensuales" o "2 cuotas", es 2. Si es pago único anual, es 1. Si no se detecta, usa 1 y agrégalo a "avisos".
 - "prima" es el monto ANUAL TOTAL que paga el cliente (con impuestos si aplica), como número, no string.
 - Las fechas en formato YYYY-MM-DD.
 - "beneficios" es un resumen en texto plano tipo lista de las coberturas/beneficios del documento.
-- Campo no encontrado: usa "" o 0 (para prima) y agrega una línea en "avisos" explicando cuál campo no se encontró.`;
+- Campo no encontrado: si no se detecta algún campo, usar "" o 1 (para numeroCuotas) o 0 (para prima) y agregarlo a "avisos" explicando cuál campo no se encontró.`;
 
 function limpiarJson(texto: string): string {
   let limpio = texto.trim();

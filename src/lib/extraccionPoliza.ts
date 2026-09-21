@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 import { renderizarPaginasComoImagenes } from "./renderizarPdf";
+import { TIPOS_SEGURO } from "./types";
+import type { TipoSeguro } from "./types";
 
 const ERROR_GENERICO =
   "No se pudo analizar el documento. Intente de nuevo o cargue los datos manualmente.";
@@ -21,6 +23,11 @@ export interface ResultadoExtraccion {
     prima: number;
     observaciones: string;
     beneficios: string;
+    coberturaAuto: string;
+    frecuenciaPago: string;
+    conductoPago: string;
+    diaPago: string;
+    numeroCuotas: number;
   };
   avisos: string[];
 }
@@ -30,7 +37,7 @@ function esTexto(valor: unknown): valor is string {
 }
 
 function normalizarTexto(valor: unknown): string {
-  return esTexto(valor) ? valor : "";
+  return esTexto(valor) ? valor.trim() : "";
 }
 
 function normalizarNumero(valor: unknown): number {
@@ -40,6 +47,86 @@ function normalizarNumero(valor: unknown): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 0;
+}
+
+function normalizarTipoSeguro(valor: unknown): string {
+  const str = normalizarTexto(valor);
+  const match = TIPOS_SEGURO.find(
+    (t) => t.toLowerCase() === str.toLowerCase(),
+  );
+  if (match) return match;
+  if (/auto|veh[ií]culo|autom[oó]vil/i.test(str)) return "Auto";
+  if (/viajer[ao]|viaje/i.test(str)) return "Asistencia Viajera";
+  return TIPOS_SEGURO.includes(str as TipoSeguro) ? str : "Otro";
+}
+
+function normalizarCoberturaAuto(valor: unknown): string {
+  if (!esTexto(valor)) return "";
+  const v = valor.trim().toLowerCase();
+  if (v.includes("tercero") || v.includes("responsabilidad civil") || v.includes("rc")) {
+    return "Solo a terceros";
+  }
+  if (v.includes("completa") || v.includes("amplia") || v.includes("comprensiv") || v.includes("colisi")) {
+    return "Cobertura completa";
+  }
+  if (valor === "Cobertura completa" || valor === "Solo a terceros") {
+    return valor;
+  }
+  return "";
+}
+
+function normalizarFrecuenciaPago(valor: unknown): string {
+  if (!esTexto(valor)) return "";
+  const v = valor.trim().toLowerCase();
+  if (v.includes("mensual")) return "Mensual";
+  if (v.includes("semestral")) return "Semestral";
+  if (v.includes("trimestral")) return "Trimestral";
+  if (v.includes("anual") || v.includes("contado") || v.includes("único") || v.includes("unico")) return "Anual";
+  if (["Anual", "Semestral", "Trimestral", "Mensual"].includes(valor.trim())) {
+    return valor.trim();
+  }
+  return "";
+}
+
+function normalizarConductoPago(valor: unknown): string {
+  if (!esTexto(valor)) return "";
+  const v = valor.trim().toLowerCase();
+  if (
+    v.includes("tarjeta") ||
+    v.includes("tcr") ||
+    v.includes("t.c.") ||
+    v.includes("crédito") ||
+    v.includes("credito")
+  ) {
+    return "TCR";
+  }
+  if (
+    v.includes("ach") ||
+    v.includes("banco") ||
+    v.includes("cuenta") ||
+    v.includes("débito") ||
+    v.includes("debito")
+  ) {
+    return "ACH";
+  }
+  if (
+    v.includes("voluntari") ||
+    v.includes("directo") ||
+    v.includes("ventanilla") ||
+    v.includes("cobrador")
+  ) {
+    return "Voluntaria";
+  }
+  if (["Voluntaria", "TCR", "ACH"].includes(valor.trim())) {
+    return valor.trim();
+  }
+  return "";
+}
+
+function normalizarNumeroCuotas(valor: unknown): number {
+  const num = normalizarNumero(valor);
+  if (num >= 1) return Math.floor(num);
+  return 1;
 }
 
 function validarResultado(datos: unknown): datos is ResultadoExtraccion {
@@ -82,6 +169,35 @@ export async function extraerPolizaDesdeArchivo(
     throw new Error(ERROR_GENERICO);
   }
 
+  const rawPoliza = (respuesta.poliza ?? {}) as Record<string, unknown>;
+
+  const tipoSeguro = normalizarTipoSeguro(rawPoliza.tipoSeguro);
+  const coberturaAuto = normalizarCoberturaAuto(rawPoliza.coberturaAuto);
+  const frecuenciaPago = normalizarFrecuenciaPago(rawPoliza.frecuenciaPago);
+  const conductoPago = normalizarConductoPago(rawPoliza.conductoPago);
+  const diaPago = normalizarTexto(rawPoliza.diaPago);
+  const numeroCuotas = normalizarNumeroCuotas(rawPoliza.numeroCuotas);
+
+  const avisos: string[] = Array.isArray(respuesta.avisos)
+    ? respuesta.avisos.filter(esTexto)
+    : [];
+
+  if (tipoSeguro === "Auto" && !coberturaAuto && !avisos.some((a) => a.toLowerCase().includes("cobertura"))) {
+    avisos.push("No se encontró la cobertura de auto.");
+  }
+  if (!frecuenciaPago && !avisos.some((a) => a.toLowerCase().includes("frecuencia"))) {
+    avisos.push("No se encontró la frecuencia de pago.");
+  }
+  if (!conductoPago && !avisos.some((a) => a.toLowerCase().includes("conducto"))) {
+    avisos.push("No se encontró el conducto de pago.");
+  }
+  if (!diaPago && !avisos.some((a) => a.toLowerCase().includes("día") || a.toLowerCase().includes("dia"))) {
+    avisos.push("No se encontró el día de pago.");
+  }
+  if (!rawPoliza.numeroCuotas && !avisos.some((a) => a.toLowerCase().includes("cuota"))) {
+    avisos.push("No se encontró el número de cuotas (se asignó 1 por defecto).");
+  }
+
   return {
     cliente: {
       nombre: normalizarTexto(respuesta.cliente.nombre),
@@ -90,18 +206,21 @@ export async function extraerPolizaDesdeArchivo(
       email: normalizarTexto(respuesta.cliente.email),
     },
     poliza: {
-      aseguradora: normalizarTexto(respuesta.poliza.aseguradora),
-      tipoSeguro: normalizarTexto(respuesta.poliza.tipoSeguro),
-      detalleBien: normalizarTexto(respuesta.poliza.detalleBien),
-      numeroPoliza: normalizarTexto(respuesta.poliza.numeroPoliza),
-      vigenciaInicio: normalizarTexto(respuesta.poliza.vigenciaInicio),
-      vigenciaFin: normalizarTexto(respuesta.poliza.vigenciaFin),
-      prima: normalizarNumero(respuesta.poliza.prima),
-      observaciones: normalizarTexto(respuesta.poliza.observaciones),
-      beneficios: normalizarTexto(respuesta.poliza.beneficios),
+      aseguradora: normalizarTexto(rawPoliza.aseguradora),
+      tipoSeguro,
+      detalleBien: normalizarTexto(rawPoliza.detalleBien),
+      numeroPoliza: normalizarTexto(rawPoliza.numeroPoliza),
+      vigenciaInicio: normalizarTexto(rawPoliza.vigenciaInicio),
+      vigenciaFin: normalizarTexto(rawPoliza.vigenciaFin),
+      prima: normalizarNumero(rawPoliza.prima),
+      observaciones: normalizarTexto(rawPoliza.observaciones),
+      beneficios: normalizarTexto(rawPoliza.beneficios),
+      coberturaAuto,
+      frecuenciaPago,
+      conductoPago,
+      diaPago,
+      numeroCuotas,
     },
-    avisos: Array.isArray(respuesta.avisos)
-      ? respuesta.avisos.filter(esTexto)
-      : [],
+    avisos,
   };
 }

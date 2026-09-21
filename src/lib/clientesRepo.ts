@@ -15,6 +15,11 @@ function filaAPoliza(fila: {
   prima: number;
   observaciones: string;
   beneficios: string;
+  cobertura_auto?: string | null;
+  frecuencia_pago?: string | null;
+  conducto_pago?: string | null;
+  dia_pago?: string | null;
+  numero_cuotas?: number | null;
 }): Poliza {
   return {
     id: fila.id,
@@ -28,6 +33,11 @@ function filaAPoliza(fila: {
     prima: fila.prima,
     observaciones: fila.observaciones,
     beneficios: fila.beneficios,
+    coberturaAuto: (fila.cobertura_auto as Poliza["coberturaAuto"]) || undefined,
+    frecuenciaPago: (fila.frecuencia_pago as Poliza["frecuenciaPago"]) || undefined,
+    conductoPago: (fila.conducto_pago as Poliza["conductoPago"]) || undefined,
+    diaPago: fila.dia_pago ?? undefined,
+    numeroCuotas: fila.numero_cuotas ?? undefined,
   };
 }
 
@@ -42,6 +52,11 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
     prima: data.prima,
     observaciones: data.observaciones,
     beneficios: data.beneficios,
+    cobertura_auto: data.coberturaAuto ?? null,
+    frecuencia_pago: data.frecuenciaPago ?? null,
+    conducto_pago: data.conductoPago ?? null,
+    dia_pago: data.diaPago ?? null,
+    numero_cuotas: data.numeroCuotas ?? null,
   };
 }
 

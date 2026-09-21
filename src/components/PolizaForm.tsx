@@ -1,8 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { FormEvent } from "react";
-import { DollarSign, FileText, Save, X } from "lucide-react";
-import { TIPOS_SEGURO } from "../lib/types.ts";
-import type { Poliza, TipoSeguro } from "../lib/types.ts";
+import { CreditCard, DollarSign, FileText, Save, ShieldCheck, X } from "lucide-react";
+import {
+  TIPOS_SEGURO,
+  FRECUENCIAS_PAGO,
+  CONDUCTOS_PAGO,
+} from "../lib/types.ts";
+import type {
+  Poliza,
+  TipoSeguro,
+  CoberturaAuto,
+  FrecuenciaPago,
+  ConductoPago,
+} from "../lib/types.ts";
 import { Button } from "./ui/button.tsx";
 import { Input } from "./ui/input.tsx";
 import { MensajeError } from "./MensajeError.tsx";
@@ -19,6 +29,11 @@ const vacio: PolizaFormValues = {
   prima: 0,
   observaciones: "",
   beneficios: "",
+  coberturaAuto: undefined,
+  frecuenciaPago: undefined,
+  conductoPago: undefined,
+  diaPago: "",
+  numeroCuotas: 1,
 };
 
 const claseSelect =
@@ -27,18 +42,70 @@ const claseSelect =
 const claseTextarea =
   "min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground shadow-2xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none";
 
+export function calcularCuotas(prima: number, cuotas: number): number[] {
+  const n = Math.max(1, Math.floor(cuotas || 1));
+  const montoTotal = Math.max(0, Number(prima) || 0);
+  if (n === 1) return [Math.round(montoTotal * 100) / 100];
+
+  const cuotaBase = Math.round((montoTotal / n) * 100) / 100;
+  const sumaAnteriores = cuotaBase * (n - 1);
+  const ultimaCuota = Math.round((montoTotal - sumaAnteriores) * 100) / 100;
+
+  const resultado: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    resultado.push(cuotaBase);
+  }
+  resultado.push(ultimaCuota);
+  return resultado;
+}
+
+export function formatearCuotasTexto(cuotas: number[]): string {
+  if (cuotas.length === 0) return "$0.00";
+  const cuotaBase = cuotas[0];
+  const todasIguales = cuotas.every((c) => c === cuotaBase);
+  if (todasIguales) {
+    return `${cuotas.length} ${cuotas.length === 1 ? "cuota" : "cuotas"} de $${cuotaBase.toFixed(2)}`;
+  }
+  const nAnteriores = cuotas.length - 1;
+  const ultima = cuotas[cuotas.length - 1];
+  return `${nAnteriores} ${nAnteriores === 1 ? "cuota" : "cuotas"} de $${cuotaBase.toFixed(2)} y 1 cuota de $${ultima.toFixed(2)}`;
+}
+
+function inicializarValores(inicial?: PolizaFormValues): PolizaFormValues {
+  return {
+    ...vacio,
+    ...inicial,
+  };
+}
+
 export function PolizaForm({
   inicial,
+  esEdicion,
   onGuardar,
   onCancelar,
 }: {
   inicial?: PolizaFormValues;
+  esEdicion?: boolean;
   onGuardar: (valores: PolizaFormValues) => Promise<void>;
   onCancelar: () => void;
 }) {
-  const [valores, setValores] = useState<PolizaFormValues>(inicial ?? vacio);
+  const [valores, setValores] = useState<PolizaFormValues>(() => inicializarValores(inicial));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (inicial) {
+      setValores(inicializarValores(inicial));
+    }
+  }, [inicial]);
+
+  const cuotasCalculadas = useMemo(() => {
+    return calcularCuotas(valores.prima, valores.numeroCuotas ?? 1);
+  }, [valores.prima, valores.numeroCuotas]);
+
+  const textoCuotas = useMemo(() => {
+    return formatearCuotasTexto(cuotasCalculadas);
+  }, [cuotasCalculadas]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -53,6 +120,8 @@ export function PolizaForm({
     }
   }
 
+  const esModoEdicion = esEdicion !== undefined ? esEdicion : Boolean(inicial);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -62,7 +131,7 @@ export function PolizaForm({
         <div className="flex items-center gap-2">
           <FileText className="size-5 text-primary" aria-hidden="true" />
           <h3 className="text-lg font-semibold tracking-tight text-foreground">
-            {inicial ? "Editar póliza" : "Nueva póliza"}
+            {esModoEdicion ? "Editar póliza" : "Nueva póliza"}
           </h3>
         </div>
         <button
@@ -94,7 +163,14 @@ export function PolizaForm({
           </span>
           <select
             value={valores.tipoSeguro}
-            onChange={(e) => setValores({ ...valores, tipoSeguro: e.target.value as TipoSeguro })}
+            onChange={(e) => {
+              const nuevoTipo = e.target.value as TipoSeguro;
+              setValores({
+                ...valores,
+                tipoSeguro: nuevoTipo,
+                coberturaAuto: nuevoTipo === "Auto" ? valores.coberturaAuto : undefined,
+              });
+            }}
             className={claseSelect}
           >
             {TIPOS_SEGURO.map((tipo) => (
@@ -104,6 +180,29 @@ export function PolizaForm({
             ))}
           </select>
         </label>
+
+        {valores.tipoSeguro === "Auto" && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+              Cobertura
+            </span>
+            <select
+              value={valores.coberturaAuto ?? ""}
+              onChange={(e) =>
+                setValores({
+                  ...valores,
+                  coberturaAuto: (e.target.value as CoberturaAuto) || undefined,
+                })
+              }
+              className={claseSelect}
+            >
+              <option value="">Seleccione una opción…</option>
+              <option value="Cobertura completa">Auto - Cobertura completa</option>
+              <option value="Solo a terceros">Auto - Solo a terceros</option>
+            </select>
+          </label>
+        )}
 
         <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
           <span>
@@ -169,6 +268,102 @@ export function PolizaForm({
           />
         </label>
 
+        {/* Sección de Pago */}
+        <div className="sm:col-span-2 mt-2 rounded-lg border border-border/70 bg-muted/20 p-4">
+          <div className="mb-3.5 flex items-center gap-2 border-b border-border/60 pb-2.5">
+            <CreditCard className="size-4 text-primary" aria-hidden="true" />
+            <h4 className="text-sm font-semibold tracking-tight text-foreground">
+              Información de pago
+            </h4>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Frecuencia de pago</span>
+              <select
+                value={valores.frecuenciaPago ?? ""}
+                onChange={(e) =>
+                  setValores({
+                    ...valores,
+                    frecuenciaPago: (e.target.value as FrecuenciaPago) || undefined,
+                  })
+                }
+                className={claseSelect}
+              >
+                <option value="">Seleccione una opción…</option>
+                {FRECUENCIAS_PAGO.map((frec) => (
+                  <option key={frec} value={frec}>
+                    {frec}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Conducto de pago</span>
+              <select
+                value={valores.conductoPago ?? ""}
+                onChange={(e) =>
+                  setValores({
+                    ...valores,
+                    conductoPago: (e.target.value as ConductoPago) || undefined,
+                  })
+                }
+                className={claseSelect}
+              >
+                <option value="">Seleccione una opción…</option>
+                {CONDUCTOS_PAGO.map((cond) => (
+                  <option key={cond} value={cond}>
+                    {cond}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Día de pago</span>
+              <Input
+                value={valores.diaPago ?? ""}
+                onChange={(e) => setValores({ ...valores, diaPago: e.target.value })}
+                placeholder="Ej. 21 del mes correspondiente"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+              <span>Número de cuotas</span>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={valores.numeroCuotas ?? 1}
+                onChange={(e) =>
+                  setValores({
+                    ...valores,
+                    numeroCuotas: Math.max(1, parseInt(e.target.value, 10) || 1),
+                  })
+                }
+                placeholder="1"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+              <span>Monto por cuota</span>
+              <div className="relative">
+                <Input
+                  readOnly
+                  tabIndex={-1}
+                  value={textoCuotas}
+                  className="bg-muted/60 font-semibold text-foreground cursor-default focus-visible:ring-0"
+                  aria-label="Monto de cuotas calculado"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Monto calculado en modo solo lectura a partir de la prima anual (${(valores.prima || 0).toFixed(2)}) y {valores.numeroCuotas ?? 1} cuota{(valores.numeroCuotas ?? 1) === 1 ? "" : "s"}.
+              </p>
+            </label>
+          </div>
+        </div>
+
         <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
           <span>Observaciones o notas adicionales</span>
           <textarea
@@ -206,4 +401,3 @@ export function PolizaForm({
     </form>
   );
 }
-
