@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage.tsx";
 import { ClientesPage } from "./pages/ClientesPage.tsx";
 import { ClienteDetailPage } from "./pages/ClienteDetailPage.tsx";
 import { ImportarPage } from "./pages/ImportarPage.tsx";
+import { PerfilPage } from "./pages/PerfilPage.tsx";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/clientes/nuevo" element={<ClienteDetailPage />} />
             <Route path="/clientes/:clienteId" element={<ClienteDetailPage />} />
             <Route path="/importar" element={<ImportarPage />} />
+            <Route path="/perfil" element={<PerfilPage />} />
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

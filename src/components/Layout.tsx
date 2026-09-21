@@ -19,6 +19,7 @@ const ENLACES = [
   { to: "/dashboard", label: "Renovaciones", Icono: CalendarClock },
   { to: "/clientes", label: "Clientes", Icono: Users },
   { to: "/importar", label: "Importar Excel", Icono: Upload },
+  { to: "/perfil", label: "Perfil", Icono: UserIcon },
 ];
 
 function clasesEnlace(isActive: boolean, tamano: string): string {
@@ -78,14 +79,22 @@ export function Layout() {
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
+            <Button
+              size="sm"
+              onClick={() => navigate("/clientes")}
+              className="font-medium shadow-2xs"
+            >
+              + Nueva Póliza
+            </Button>
             {user?.email ? (
-              <div
-                className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/50 px-3 py-1 text-sm text-muted-foreground"
-                title={user.email}
+              <Link
+                to="/perfil"
+                className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/50 px-3 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title={`Perfil: ${user.email}`}
               >
                 <UserIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="max-w-40 truncate">{user.email}</span>
-              </div>
+                <span className="max-w-40 truncate">{user.user_metadata?.nombre || user.email}</span>
+              </Link>
             ) : null}
             <Button
               variant="outline"
@@ -130,11 +139,24 @@ export function Layout() {
               ))}
 
               <div className="mt-2 flex flex-col gap-3 border-t border-border/80 pt-3">
+                <Button
+                  className="w-full justify-center font-medium"
+                  onClick={() => {
+                    cerrarMenu();
+                    navigate("/clientes");
+                  }}
+                >
+                  + Nueva Póliza
+                </Button>
                 {user?.email ? (
-                  <div className="flex items-center gap-2 px-3 text-sm text-muted-foreground">
+                  <Link
+                    to="/perfil"
+                    onClick={cerrarMenu}
+                    className="flex items-center gap-2 px-3 text-sm text-muted-foreground hover:text-foreground"
+                  >
                     <UserIcon className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{user.email}</span>
-                  </div>
+                    <span className="truncate">{user.user_metadata?.nombre || user.email}</span>
+                  </Link>
                 ) : null}
                 <Button variant="outline" className="w-full justify-center" onClick={() => void handleLogout()}>
                   <LogOut aria-hidden="true" />
