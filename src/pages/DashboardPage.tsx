@@ -3,23 +3,47 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   Building2,
+  Cake,
   Calendar,
   ChevronRight,
   FileSpreadsheet,
   FileText,
+  Phone,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
-import { obtenerRenovacionesProximas, textoDiasRestantes } from "../lib/renovaciones.ts";
+import {
+  contarClientesActivos,
+  contarPolizasActivas,
+  obtenerCumpleanosProximos,
+  obtenerRenovacionesProximas,
+  textoDiasRestantes,
+} from "../lib/renovaciones.ts";
 import type { ItemRenovacion } from "../lib/renovaciones.ts";
+import { cn } from "../lib/utils.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Cargando } from "../components/Cargando.tsx";
 import { MensajeError } from "../components/MensajeError.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Badge } from "../components/ui/badge.tsx";
+
+const MESES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
 
 export function DashboardPage() {
   const [clientesConPolizas, setClientesConPolizas] = useState<ClienteConPolizas[]>([]);
@@ -38,6 +62,28 @@ export function DashboardPage() {
   const renovaciones: ItemRenovacion[] = useMemo(() => {
     return obtenerRenovacionesProximas(clientesConPolizas);
   }, [clientesConPolizas]);
+
+  const clientesActivos = useMemo(
+    () => contarClientesActivos(clientesConPolizas),
+    [clientesConPolizas],
+  );
+
+  const polizasActivas = useMemo(
+    () => contarPolizasActivas(clientesConPolizas),
+    [clientesConPolizas],
+  );
+
+  const cumpleanosProximos = useMemo(
+    () => obtenerCumpleanosProximos(clientesConPolizas),
+    [clientesConPolizas],
+  );
+
+  const kpis = [
+    { etiqueta: "Clientes activos", valor: clientesActivos, icono: Users, alerta: false },
+    { etiqueta: "Pólizas activas", valor: polizasActivas, icono: ShieldCheck, alerta: false },
+    // Mismo cálculo que alimenta el badge del título (no se duplica la lógica).
+    { etiqueta: "Por vencer en 30 días", valor: renovaciones.length, icono: AlertTriangle, alerta: true },
+  ];
 
   return (
     <section className="flex flex-col gap-6">
@@ -65,6 +111,84 @@ export function DashboardPage() {
       {loading ? <Cargando mensaje="Cargando renovaciones…" /> : null}
 
       {error ? <MensajeError>{error}</MensajeError> : null}
+
+      {/* Indicadores KPI */}
+      {!loading && !error ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {kpis.map(({ etiqueta, valor, icono: Icono, alerta }) => (
+            <div
+              key={etiqueta}
+              className="flex items-center gap-3.5 rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5"
+            >
+              <div
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                  alerta
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    : "bg-primary/10 text-primary",
+                )}
+              >
+                <Icono className="size-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground">{etiqueta}</p>
+                <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">{valor}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Cumpleaños próximos */}
+      {!loading && !error ? (
+        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
+          <div className="mb-3.5 flex items-center gap-2.5 border-b border-border/60 pb-3">
+            <Cake className="size-5 text-primary" aria-hidden="true" />
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              Cumpleaños próximos
+            </h2>
+            {cumpleanosProximos.length > 0 ? (
+              <Badge variant="secondary" className="px-2 py-0 text-xs">
+                {cumpleanosProximos.length}
+              </Badge>
+            ) : null}
+          </div>
+
+          {cumpleanosProximos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Sin cumpleaños próximos en los próximos 30 días.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {cumpleanosProximos.map((c) => (
+                <li
+                  key={c.clienteId}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                >
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                    <Link
+                      to={`/clientes/${c.clienteId}`}
+                      className="truncate text-sm font-medium text-foreground hover:text-primary"
+                    >
+                      {c.clienteNombre}
+                    </Link>
+                    {c.clienteTelefono ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Phone className="size-3.5 shrink-0" aria-hidden="true" />
+                        {c.clienteTelefono}
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
+                    <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
+                    {c.dia} de {MESES[c.mes - 1]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       {!loading && !error && renovaciones.length === 0 ? (
         <EmptyState
