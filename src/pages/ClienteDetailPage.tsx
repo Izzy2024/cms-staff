@@ -41,7 +41,13 @@ import { Cargando } from "../components/Cargando.tsx";
 import { MensajeError } from "../components/MensajeError.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 
-const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
+const clienteVacio: Omit<Cliente, "id"> = {
+  nombre: "",
+  cedula: "",
+  telefono: "",
+  email: "",
+  fechaNacimiento: "",
+};
 
 function polizaExtraidaAFormulario(poliza: ResultadoExtraccion["poliza"]): PolizaFormValues {
   const tipoSeguro = TIPOS_SEGURO.includes(poliza.tipoSeguro as TipoSeguro)
@@ -90,6 +96,7 @@ export function ClienteDetailPage() {
           cedula: cliente.cedula,
           telefono: cliente.telefono,
           email: cliente.email ?? "",
+          fechaNacimiento: cliente.fechaNacimiento ?? "",
         });
         setPolizas(listaPolizas);
       })
@@ -109,6 +116,7 @@ export function ClienteDetailPage() {
         nombre: datos.nombre,
         cedula: datos.cedula,
         telefono: datos.telefono,
+        fechaNacimiento: datos.fechaNacimiento,
       };
       if (email) payload.email = email;
       if (esNuevo) {
@@ -155,6 +163,7 @@ export function ClienteDetailPage() {
       cedula: resultado.cliente.cedula.trim() ? resultado.cliente.cedula : previo.cedula,
       telefono: resultado.cliente.telefono.trim() ? resultado.cliente.telefono : previo.telefono,
       email: resultado.cliente.email.trim() ? resultado.cliente.email : previo.email,
+      fechaNacimiento: previo.fechaNacimiento,
     }));
     setExtraccionPoliza(polizaExtraidaAFormulario(resultado.poliza));
     setArchivoPolizaExtraida(archivo);
@@ -287,6 +296,19 @@ export function ClienteDetailPage() {
                 placeholder="Ej. juan@correo.com"
                 value={datos.email ?? ""}
                 onChange={(e) => setDatos({ ...datos, email: e.target.value })}
+              />
+            </div>
+          </label>
+
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+            <span>Fecha de nacimiento (opcional)</span>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="date"
+                className="pl-9"
+                value={datos.fechaNacimiento ?? ""}
+                onChange={(e) => setDatos({ ...datos, fechaNacimiento: e.target.value })}
               />
             </div>
           </label>
