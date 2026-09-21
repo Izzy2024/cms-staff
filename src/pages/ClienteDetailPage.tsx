@@ -10,6 +10,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  RefreshCw,
   Save,
   Shield,
   ShieldAlert,
@@ -27,8 +28,9 @@ import {
 } from "../lib/clientesRepo.ts";
 import { subirDocumento } from "../lib/documentosRepo.ts";
 import { TIPOS_SEGURO } from "../lib/types.ts";
-import type { Cliente, Poliza, TipoSeguro } from "../lib/types.ts";
+import type { Cliente, Poliza, TipoSeguro, CoberturaAuto, FrecuenciaPago, ConductoPago } from "../lib/types.ts";
 import type { ResultadoExtraccion } from "../lib/extraccionPoliza.ts";
+import { calcularDiasRestantes } from "../lib/renovaciones.ts";
 import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
 import { SubirPolizaIA } from "../components/SubirPolizaIA.tsx";
@@ -42,6 +44,44 @@ import { MensajeError } from "../components/MensajeError.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 
 const clienteVacio: Omit<Cliente, "id"> = { nombre: "", cedula: "", telefono: "", email: "" };
+
+function normalizarTextoComparacion(txt?: string): string {
+  return (txt ?? "").trim().toLowerCase();
+}
+
+function buscarPolizaCandidataRenovacion(
+  polizasExistentes: Poliza[],
+  extraida: PolizaFormValues,
+): Poliza | null {
+  const candidatas = polizasExistentes.filter((p) => {
+    const dias = calcularDiasRestantes(p.vigenciaFin);
+    return dias !== null && dias <= 30;
+  });
+
+  const numExtraida = normalizarTextoComparacion(extraida.numeroPoliza);
+  if (numExtraida) {
+    const matchNumero = candidatas.find(
+      (p) => normalizarTextoComparacion(p.numeroPoliza) === numExtraida,
+    );
+    if (matchNumero) return matchNumero;
+  }
+
+  const asex = normalizarTextoComparacion(extraida.aseguradora);
+  const tipox = normalizarTextoComparacion(extraida.tipoSeguro);
+  const detx = normalizarTextoComparacion(extraida.detalleBien);
+
+  if (asex || detx) {
+    const matchCombinacion = candidatas.find(
+      (p) =>
+        normalizarTextoComparacion(p.aseguradora) === asex &&
+        normalizarTextoComparacion(p.tipoSeguro) === tipox &&
+        normalizarTextoComparacion(p.detalleBien) === detx,
+    );
+    if (matchCombinacion) return matchCombinacion;
+  }
+
+  return null;
+}
 
 function polizaExtraidaAFormulario(poliza: ResultadoExtraccion["poliza"]): PolizaFormValues {
   const tipoSeguro = TIPOS_SEGURO.includes(poliza.tipoSeguro as TipoSeguro)
@@ -58,6 +98,11 @@ function polizaExtraidaAFormulario(poliza: ResultadoExtraccion["poliza"]): Poliz
     prima: poliza.prima,
     observaciones: poliza.observaciones,
     beneficios: poliza.beneficios,
+    coberturaAuto: (poliza.coberturaAuto as CoberturaAuto) || undefined,
+    frecuenciaPago: (poliza.frecuenciaPago as FrecuenciaPago) || undefined,
+    conductoPago: (poliza.conductoPago as ConductoPago) || undefined,
+    diaPago: poliza.diaPago || undefined,
+    numeroCuotas: poliza.numeroCuotas || 1,
   };
 }
 
@@ -73,6 +118,7 @@ export function ClienteDetailPage() {
   const [guardando, setGuardando] = useState(false);
   const [mostrarFormPoliza, setMostrarFormPoliza] = useState(false);
   const [polizaEditando, setPolizaEditando] = useState<Poliza | null>(null);
+  const [polizaRenovando, setPolizaRenovando] = useState<Poliza | null>(null);
   const [extraccionPoliza, setExtraccionPoliza] = useState<PolizaFormValues | null>(null);
   const [archivoPolizaExtraida, setArchivoPolizaExtraida] = useState<File | null>(null);
 
@@ -129,6 +175,18 @@ export function ClienteDetailPage() {
     setError("");
     if (polizaEditando) {
       await updatePoliza(clienteId, polizaEditando.id, valores);
+      if (archivoPolizaExtraida) {
+        try {
+          await subirDocumento(clienteId, polizaEditando.id, archivoPolizaExtraida, "poliza");
+        } catch {
+          setError(
+            "La póliza se guardó correctamente, pero no se pudo adjuntar el PDF. Puede subirlo de nuevo desde los documentos de la póliza.",
+          );
+        }
+      }
+      setExtraccionPoliza(null);
+      setArchivoPolizaExtraida(null);
+      setPolizaRenovando(null);
     } else {
       const nuevaPolizaId = await createPoliza(clienteId, valores);
       if (archivoPolizaExtraida) {
@@ -142,11 +200,13 @@ export function ClienteDetailPage() {
       }
       setExtraccionPoliza(null);
       setArchivoPolizaExtraida(null);
+      setPolizaRenovando(null);
     }
     const listaPolizas = await listPolizas(clienteId);
     setPolizas(listaPolizas);
     setMostrarFormPoliza(false);
     setPolizaEditando(null);
+    setPolizaRenovando(null);
   }
 
   function handleExtraccionNuevoCliente(resultado: ResultadoExtraccion, archivo: File): void {
@@ -161,9 +221,18 @@ export function ClienteDetailPage() {
   }
 
   function handleExtraccionParaPoliza(resultado: ResultadoExtraccion, archivo: File): void {
-    setExtraccionPoliza(polizaExtraidaAFormulario(resultado.poliza));
+    const formValues = polizaExtraidaAFormulario(resultado.poliza);
+    setExtraccionPoliza(formValues);
     setArchivoPolizaExtraida(archivo);
-    setPolizaEditando(null);
+
+    const match = buscarPolizaCandidataRenovacion(polizas, formValues);
+    if (match) {
+      setPolizaEditando(match);
+      setPolizaRenovando(match);
+    } else {
+      setPolizaEditando(null);
+      setPolizaRenovando(null);
+    }
     setMostrarFormPoliza(true);
   }
 
@@ -316,6 +385,8 @@ export function ClienteDetailPage() {
               <Button
                 onClick={() => {
                   setPolizaEditando(null);
+                  setPolizaRenovando(null);
+                  setExtraccionPoliza(null);
                   setMostrarFormPoliza(true);
                 }}
               >
@@ -329,12 +400,44 @@ export function ClienteDetailPage() {
 
           {mostrarFormPoliza ? (
             <div className="mt-2">
+              {polizaRenovando ? (
+                <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <RefreshCw className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden="true" />
+                    <div className="text-sm">
+                      <p className="font-semibold text-amber-900">Renovación detectada</p>
+                      <p className="mt-0.5 text-amber-800">
+                        Esto parece renovar la póliza N°{" "}
+                        <span className="font-mono font-semibold">{polizaRenovando.numeroPoliza}</span> que vencía
+                        el <span className="font-semibold">{polizaRenovando.vigenciaFin}</span>. Se actualizará
+                        esa póliza en vez de crear una nueva.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-amber-400 bg-white text-amber-900 hover:bg-amber-100"
+                    onClick={() => {
+                      setPolizaEditando(null);
+                      setPolizaRenovando(null);
+                    }}
+                  >
+                    Crear como nueva póliza
+                  </Button>
+                </div>
+              ) : null}
+
               <PolizaForm
-                inicial={polizaEditando ?? extraccionPoliza ?? undefined}
+                inicial={extraccionPoliza ?? polizaEditando ?? undefined}
+                esEdicion={Boolean(polizaEditando)}
                 onGuardar={handleGuardarPoliza}
                 onCancelar={() => {
                   setMostrarFormPoliza(false);
                   setPolizaEditando(null);
+                  setPolizaRenovando(null);
+                  setExtraccionPoliza(null);
                 }}
               />
             </div>
@@ -349,6 +452,8 @@ export function ClienteDetailPage() {
                 <Button
                   onClick={() => {
                     setPolizaEditando(null);
+                    setPolizaRenovando(null);
+                    setExtraccionPoliza(null);
                     setMostrarFormPoliza(true);
                   }}
                 >
@@ -385,6 +490,8 @@ export function ClienteDetailPage() {
                       size="sm"
                       onClick={() => {
                         setPolizaEditando(p);
+                        setPolizaRenovando(null);
+                        setExtraccionPoliza(null);
                         setMostrarFormPoliza(true);
                       }}
                     >
