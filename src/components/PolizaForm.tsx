@@ -24,6 +24,7 @@ const vacio: PolizaFormValues = {
   tipoSeguro: "Auto",
   detalleBien: "",
   numeroPoliza: "",
+  corredor: "",
   vigenciaInicio: "",
   vigenciaFin: "",
   prima: 0,
@@ -233,6 +234,15 @@ export function PolizaForm({
               placeholder="0.00"
             />
           </div>
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
+          <span>Corredor / Agente</span>
+          <Input
+            value={valores.corredor ?? ""}
+            onChange={(e) => setValores({ ...valores, corredor: e.target.value })}
+            placeholder="Ej. Veronica Del Carmen Staff Guerra PN6961"
+          />
         </label>
 
         <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground sm:col-span-2">

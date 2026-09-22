@@ -79,13 +79,6 @@ export function Layout() {
           </nav>
 
           <div className="hidden items-center gap-3 md:flex">
-            <Button
-              size="sm"
-              onClick={() => navigate("/clientes")}
-              className="font-medium shadow-2xs"
-            >
-              + Nueva Póliza
-            </Button>
             {user?.email ? (
               <Link
                 to="/perfil"
@@ -139,15 +132,6 @@ export function Layout() {
               ))}
 
               <div className="mt-2 flex flex-col gap-3 border-t border-border/80 pt-3">
-                <Button
-                  className="w-full justify-center font-medium"
-                  onClick={() => {
-                    cerrarMenu();
-                    navigate("/clientes");
-                  }}
-                >
-                  + Nueva Póliza
-                </Button>
                 {user?.email ? (
                   <Link
                     to="/perfil"

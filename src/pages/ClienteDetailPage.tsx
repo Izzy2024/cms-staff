@@ -554,6 +554,13 @@ export function ClienteDetailPage() {
                     </span>
                   </div>
 
+                  {p.corredor && (
+                    <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
+                      <span className="font-semibold text-muted-foreground">Corredor: </span>
+                      <span className="text-foreground">{p.corredor}</span>
+                    </div>
+                  )}
+
                   {p.observaciones && (
                     <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
                       <span className="font-semibold text-muted-foreground">Observaciones: </span>

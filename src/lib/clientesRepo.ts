@@ -10,6 +10,7 @@ function filaAPoliza(fila: {
   tipo_seguro: string;
   detalle_bien: string;
   numero_poliza: string;
+  corredor?: string | null;
   vigencia_inicio: string;
   vigencia_fin: string;
   prima: number;
@@ -28,6 +29,7 @@ function filaAPoliza(fila: {
     tipoSeguro: fila.tipo_seguro as Poliza["tipoSeguro"],
     detalleBien: fila.detalle_bien,
     numeroPoliza: fila.numero_poliza,
+    corredor: fila.corredor ?? undefined,
     vigenciaInicio: fila.vigencia_inicio,
     vigenciaFin: fila.vigencia_fin,
     prima: fila.prima,
@@ -47,6 +49,7 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
     tipo_seguro: data.tipoSeguro,
     detalle_bien: data.detalleBien,
     numero_poliza: data.numeroPoliza,
+    corredor: data.corredor ?? null,
     vigencia_inicio: data.vigenciaInicio,
     vigencia_fin: data.vigenciaFin,
     prima: data.prima,

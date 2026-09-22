@@ -72,6 +72,7 @@ export interface Poliza {
   tipoSeguro: TipoSeguro;
   detalleBien: string;
   numeroPoliza: string;
+  corredor?: string;
   vigenciaInicio: string;
   vigenciaFin: string;
   prima: number;
