@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calcularDiasRestantes,
+  contarPolizasActivas,
   esClienteActivo,
   esRenovacionProxima,
   estadoClientePorFechas,
+  historialDe,
   obtenerCumpleanosProximos,
   obtenerRenovacionesProximas,
+  polizasActuales,
   textoDiasRestantes,
 } from "./renovaciones.ts";
 import type { ClienteConPolizas } from "./clientesRepo.ts";
@@ -223,5 +226,78 @@ describe("obtenerCumpleanosProximos", () => {
       REFERENCIA,
     );
     expect(resultado.map((r) => r.clienteNombre)).toEqual(["Cerca", "Lejos"]);
+  });
+});
+
+describe("polizasActuales e historialDe", () => {
+  it("polizasActuales excluye las pólizas que ya fueron renovadas", () => {
+    const p1 = poliza({ id: "p1", numeroPoliza: "POL-1" });
+    const p2 = poliza({ id: "p2", numeroPoliza: "POL-2", polizaAnteriorId: "p1" });
+    const p3 = poliza({ id: "p3", numeroPoliza: "POL-3" });
+
+    const actuales = polizasActuales([p1, p2, p3]);
+    expect(actuales.map((p) => p.id)).toEqual(["p2", "p3"]);
+  });
+
+  it("historialDe recorre la cadena de 3 vigencias de la más reciente a la más antigua", () => {
+    const p1 = poliza({ id: "p1", numeroPoliza: "POL-1", vigenciaInicio: "2024-01-01", vigenciaFin: "2025-01-01" });
+    const p2 = poliza({ id: "p2", numeroPoliza: "POL-2", vigenciaInicio: "2025-01-01", vigenciaFin: "2026-01-01", polizaAnteriorId: "p1" });
+    const p3 = poliza({ id: "p3", numeroPoliza: "POL-3", vigenciaInicio: "2026-01-01", vigenciaFin: "2027-01-01", polizaAnteriorId: "p2" });
+
+    const historialP3 = historialDe(p3, [p1, p2, p3]);
+    expect(historialP3.map((p) => p.id)).toEqual(["p2", "p1"]);
+
+    const historialP2 = historialDe(p2, [p1, p2, p3]);
+    expect(historialP2.map((p) => p.id)).toEqual(["p1"]);
+
+    const historialP1 = historialDe(p1, [p1, p2, p3]);
+    expect(historialP1).toEqual([]);
+  });
+
+  it("historialDe no cuelga ante referencias circulares", () => {
+    const p1 = poliza({ id: "p1", polizaAnteriorId: "p2" });
+    const p2 = poliza({ id: "p2", polizaAnteriorId: "p1" });
+
+    const resultado = historialDe(p1, [p1, p2]);
+    expect(resultado.map((p) => p.id)).toEqual(["p2"]);
+  });
+});
+
+describe("Vigencias renovadas ignoradas en renovaciones y KPIs", () => {
+  it("obtenerRenovacionesProximas ignora una vigencia que ya fue renovada", () => {
+    const pVieja = poliza({ id: "pVieja", vigenciaFin: "2026-09-17" }); // Vencida (-5 días)
+    const pNueva = poliza({ id: "pNueva", vigenciaFin: "2027-09-17", polizaAnteriorId: "pVieja" }); // Vigente lejano
+
+    const clientes: ClienteConPolizas[] = [
+      {
+        cliente: cliente({ id: "c1", nombre: "Cliente Renovado" }),
+        polizas: [pVieja, pNueva],
+      },
+    ];
+
+    const proximas = obtenerRenovacionesProximas(clientes, REFERENCIA);
+    expect(proximas).toEqual([]);
+  });
+
+  it("contarPolizasActivas no cuenta doble una vigencia renovada", () => {
+    const pVieja = poliza({ id: "pVieja", vigenciaFin: "2026-10-02" }); // Vigente (+10 días)
+    const pNueva = poliza({ id: "pNueva", vigenciaFin: "2027-10-02", polizaAnteriorId: "pVieja" }); // Vigente futuro
+
+    const clientes: ClienteConPolizas[] = [
+      {
+        cliente: cliente({ id: "c1", nombre: "Cliente" }),
+        polizas: [pVieja, pNueva],
+      },
+    ];
+
+    expect(contarPolizasActivas(clientes, REFERENCIA)).toBe(1);
+  });
+
+  it("estadoClientePorFechas ignora vigencias viejas ya renovadas", () => {
+    const pVieja = poliza({ id: "pVieja", vigenciaFin: "2026-09-17" }); // Vencida
+    const pNueva = poliza({ id: "pNueva", vigenciaFin: "2027-09-22", polizaAnteriorId: "pVieja" }); // Vigente
+
+    const estado = estadoClientePorFechas([pVieja, pNueva]);
+    expect(estado.activo).toBe(true);
   });
 });

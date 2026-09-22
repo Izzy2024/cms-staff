@@ -79,6 +79,39 @@ export function textoDiasRestantes(dias: number): string {
 }
 
 /**
+ * Excluye las pólizas que ya fueron renovadas (las que aparecen como
+ * polizaAnteriorId de otra póliza de la lista).
+ */
+export function polizasActuales(polizas: Poliza[]): Poliza[] {
+  const idsRenovadas = new Set(
+    polizas.map((p) => p.polizaAnteriorId).filter((id): id is string => Boolean(id)),
+  );
+  return polizas.filter((p) => !idsRenovadas.has(p.id));
+}
+
+/**
+ * Retorna las vigencias anteriores siguiendo polizaAnteriorId, de la más
+ * reciente a la más antigua. Protege contra ciclos cortando si el recorrido
+ * supera polizas.length.
+ */
+export function historialDe(poliza: Poliza, polizas: Poliza[]): Poliza[] {
+  const porId = new Map(polizas.map((p) => [p.id, p]));
+  const historial: Poliza[] = [];
+  const visitados = new Set<string>([poliza.id]);
+  let actualId = poliza.polizaAnteriorId;
+
+  while (actualId && historial.length < polizas.length && !visitados.has(actualId)) {
+    visitados.add(actualId);
+    const anterior = porId.get(actualId);
+    if (!anterior) break;
+    historial.push(anterior);
+    actualId = anterior.polizaAnteriorId;
+  }
+
+  return historial;
+}
+
+/**
  * A partir de la lista de clientes con sus pólizas, extrae las pólizas cuya vigencia
  * esté en los próximos 30 días o menos (incluyendo ya vencidas) y las ordena por fecha de
  * vencimiento más próxima primero.
@@ -90,7 +123,7 @@ export function obtenerRenovacionesProximas(
   const items: ItemRenovacion[] = [];
 
   for (const { cliente, polizas } of clientes) {
-    for (const poliza of polizas) {
+    for (const poliza of polizasActuales(polizas)) {
       const dias = calcularDiasRestantes(poliza.vigenciaFin, fechaReferencia);
       if (dias !== null && dias <= 30) {
         items.push({
@@ -125,7 +158,7 @@ export function obtenerRenovacionesProximas(
 export function estadoClientePorFechas(polizas: Poliza[]): { activo: boolean; diasRelevante: number | null } {
   let mejorActiva: number | null = null;
   let mejorVencida: number | null = null;
-  for (const p of polizas) {
+  for (const p of polizasActuales(polizas)) {
     const dias = calcularDiasRestantes(p.vigenciaFin);
     if (dias === null) continue;
     if (dias >= 0) {
@@ -169,7 +202,7 @@ export function contarPolizasActivas(
 ): number {
   let activas = 0;
   for (const { polizas } of clientes) {
-    for (const poliza of polizas) {
+    for (const poliza of polizasActuales(polizas)) {
       const dias = calcularDiasRestantes(poliza.vigenciaFin, fechaReferencia);
       if (dias !== null && dias >= 0) activas += 1;
     }
