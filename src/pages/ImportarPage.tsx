@@ -575,8 +575,10 @@ export function ImportarPage() {
           </p>
 
           {polizasOmitidas > 0 ? (
-            <p className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-300">
-              {polizasOmitidas} pólizas omitidas porque ya existían
+            <p className="mt-1 text-lg font-semibold text-muted-foreground">
+              {polizasOmitidas === 1
+                ? "1 póliza omitida porque ya existía"
+                : `${polizasOmitidas} pólizas omitidas porque ya existían`}
             </p>
           ) : null}
 
