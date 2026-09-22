@@ -167,7 +167,7 @@ export function ClienteDetailPage() {
       if (email) payload.email = email;
       if (esNuevo) {
         const nuevoId = await createCliente(payload);
-        // ponytail: el estado sobrevive al navigate() porque /clientes/nuevo y /clientes/:id renderizan la misma instancia de ClienteDetailPage; si algun dia se le pone key a la ruta, pasar la extraccion por navigate state.
+        // ponytail: el estado sobrevive al navigate() porque /clientes/nuevo y /clientes/:id renderizan la misma instancia de ClienteDetailPage; si algun dia se le pone key a la ruta, pasar la extraccion por navigate state. El ErrorBoundary del Layout usa resetKey (no key) justamente para no remontar esta pantalla al navegar.
         if (extraccionPoliza) setMostrarFormPoliza(true);
         navigate(`/clientes/${nuevoId}`, { replace: true });
       } else if (clienteId) {

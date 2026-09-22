@@ -5,6 +5,7 @@ import { MensajeError } from "./MensajeError.tsx";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  resetKey?: string;
 }
 
 interface ErrorBoundaryState {
@@ -24,6 +25,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: unknown): void {
     // ponytail: aqui se conecta Sentry cuando se despliegue.
     console.error(error);
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+    if (this.state.tieneError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ tieneError: false });
+    }
   }
 
   render(): ReactNode {
