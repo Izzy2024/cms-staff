@@ -2,7 +2,7 @@ import { supabase } from "./supabase.ts";
 import { validarArchivo } from "./documentosValidacion.ts";
 import type { DocumentoPoliza, TipoDocumento } from "./types.ts";
 
-const BUCKET = "documentos";
+export const BUCKET = "documentos";
 const URL_FIRMADA_SEGUNDOS = 60 * 60;
 
 function nombreSeguro(nombre: string): string {
@@ -89,7 +89,8 @@ export async function eliminarDocumento(
     .eq("id", documento.id)
     .single();
 
-  await supabase.from("documentos_poliza").delete().eq("id", documento.id);
+  const { error } = await supabase.from("documentos_poliza").delete().eq("id", documento.id);
+  if (error) throw error;
   if (fila) {
     await supabase.storage.from(BUCKET).remove([fila.storage_path]).catch(() => undefined);
   }

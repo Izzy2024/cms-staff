@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.ts";
+import { BUCKET } from "./documentosRepo.ts";
 import type { Cliente, Poliza } from "./types.ts";
 
 export type ClienteConPolizas = { cliente: Cliente; polizas: Poliza[] };
@@ -167,6 +168,17 @@ export async function updatePoliza(
 }
 
 export async function deletePoliza(clienteId: string, polizaId: string): Promise<void> {
+  const { data: documentos, error: errorDocumentos } = await supabase
+    .from("documentos_poliza")
+    .select("storage_path")
+    .eq("poliza_id", polizaId);
+  if (errorDocumentos) throw errorDocumentos;
+
   const { error } = await supabase.from("polizas").delete().eq("id", polizaId).eq("cliente_id", clienteId);
   if (error) throw error;
+
+  const rutas = (documentos ?? []).map((fila) => fila.storage_path);
+  if (rutas.length > 0) {
+    await supabase.storage.from(BUCKET).remove(rutas).catch(() => undefined);
+  }
 }
