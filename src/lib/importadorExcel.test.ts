@@ -48,7 +48,14 @@ function existentesDesdePlan(plan: PlanImportacion): ClienteConPolizas[] {
   for (const { claveCliente, poliza: pv } of plan.polizasPorCrear) {
     porClave
       .get(claveCliente)
-      ?.polizas.push(poliza({ aseguradora: pv.aseguradora, numeroPoliza: pv.numeroPoliza }));
+      ?.polizas.push(
+        poliza({
+          aseguradora: pv.aseguradora,
+          numeroPoliza: pv.numeroPoliza,
+          vigenciaInicio: pv.vigenciaInicio,
+          vigenciaFin: pv.vigenciaFin,
+        }),
+      );
   }
   return [...porClave.values()];
 }
@@ -184,5 +191,204 @@ describe("planificarImportacion", () => {
     expect(plan2.clientesNuevos).toEqual([]);
     expect(plan2.polizasPorCrear).toHaveLength(0);
     expect(plan2.omitidas).toHaveLength(2);
+  });
+
+  it("misma póliza con vigencia nueva en cliente existente se crea enlazada a la anterior", () => {
+    const existentes = [
+      existente("c1", "Carlos Gomez", [
+        poliza({
+          id: "pol-vieja",
+          aseguradora: "ASSA",
+          numeroPoliza: "POL-100",
+          vigenciaInicio: "2025-01-01",
+          vigenciaFin: "2026-01-01",
+        }),
+      ]),
+    ];
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Carlos Gomez",
+        polizas: [
+          polizaValida({
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2026-01-01",
+            vigenciaFin: "2027-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.omitidas).toHaveLength(0);
+    expect(plan.polizasPorCrear).toHaveLength(1);
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).toBe("pol-vieja");
+    expect(plan.renovacionesEnlazadas).toBe(1);
+  });
+
+  it("duplicado exacto (misma aseguradora, número y vigenciaInicio) se omite", () => {
+    const existentes = [
+      existente("c1", "Carlos Gomez", [
+        poliza({
+          id: "pol-existente",
+          aseguradora: "ASSA",
+          numeroPoliza: "POL-100",
+          vigenciaInicio: "2026-01-01",
+        }),
+      ]),
+    ];
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Carlos Gomez",
+        polizas: [
+          polizaValida({
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2026-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.omitidas).toHaveLength(1);
+    expect(plan.polizasPorCrear).toHaveLength(0);
+    expect(plan.renovacionesEnlazadas).toBe(0);
+  });
+
+  it("dos filas del archivo que reclaman la misma anterior: solo la primera enlaza", () => {
+    const existentes = [
+      existente("c1", "Carlos Gomez", [
+        poliza({
+          id: "pol-base",
+          aseguradora: "ASSA",
+          numeroPoliza: "POL-100",
+          vigenciaInicio: "2024-01-01",
+        }),
+      ]),
+    ];
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Carlos Gomez",
+        polizas: [
+          polizaValida({
+            filaNumero: 2,
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2025-01-01",
+          }),
+          polizaValida({
+            filaNumero: 3,
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2026-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.polizasPorCrear).toHaveLength(2);
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).toBe("pol-base");
+    expect(plan.polizasPorCrear[1].polizaAnteriorId).toBeNull();
+    expect(plan.renovacionesEnlazadas).toBe(1);
+  });
+
+  it("póliza ya renovada (no actual) no se vuelve a enlazar", () => {
+    const p1 = poliza({
+      id: "p1",
+      aseguradora: "ASSA",
+      numeroPoliza: "POL-100",
+      vigenciaInicio: "2024-01-01",
+    });
+    const p2 = poliza({
+      id: "p2",
+      aseguradora: "ASSA",
+      numeroPoliza: "POL-100",
+      vigenciaInicio: "2025-01-01",
+      polizaAnteriorId: "p1",
+    });
+    const existentes = [existente("c1", "Carlos Gomez", [p1, p2])];
+
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Carlos Gomez",
+        polizas: [
+          polizaValida({
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2026-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.polizasPorCrear).toHaveLength(1);
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).toBe("p2");
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).not.toBe("p1");
+    expect(plan.renovacionesEnlazadas).toBe(1);
+  });
+
+  it("cliente nuevo nunca enlaza", () => {
+    const existentes = [
+      existente("c1", "Cliente Existente", [
+        poliza({
+          id: "p1",
+          aseguradora: "ASSA",
+          numeroPoliza: "POL-100",
+          vigenciaInicio: "2025-01-01",
+        }),
+      ]),
+    ];
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Cliente Nuevo Desconocido",
+        polizas: [
+          polizaValida({
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-100",
+            vigenciaInicio: "2026-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.clientesNuevos).toEqual(["Cliente Nuevo Desconocido"]);
+    expect(plan.polizasPorCrear).toHaveLength(1);
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).toBeNull();
+    expect(plan.renovacionesEnlazadas).toBe(0);
+  });
+
+  it("misma póliza en otro cliente no enlaza", () => {
+    const existentes = [
+      existente("c1", "Cliente A", [
+        poliza({
+          id: "p-cliente-a",
+          aseguradora: "ASSA",
+          numeroPoliza: "POL-COMPARTIDA",
+          vigenciaInicio: "2025-01-01",
+        }),
+      ]),
+      existente("c2", "Cliente B", []),
+    ];
+    const grupos: ClienteAgrupado[] = [
+      {
+        nombre: "Cliente B",
+        polizas: [
+          polizaValida({
+            aseguradora: "ASSA",
+            numeroPoliza: "POL-COMPARTIDA",
+            vigenciaInicio: "2026-01-01",
+          }),
+        ],
+      },
+    ];
+    const plan = planificarImportacion(grupos, existentes);
+
+    expect(plan.polizasPorCrear).toHaveLength(1);
+    expect(plan.polizasPorCrear[0].polizaAnteriorId).toBeNull();
+    expect(plan.renovacionesEnlazadas).toBe(0);
   });
 });

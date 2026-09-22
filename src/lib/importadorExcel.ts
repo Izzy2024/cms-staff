@@ -1,5 +1,7 @@
 import readXlsxFile from "read-excel-file/browser";
 import type { ClienteConPolizas } from "./clientesRepo.ts";
+import type { Poliza } from "./types.ts";
+import { polizasActuales } from "./renovaciones.ts";
 
 export type CampoSistema =
   | "cliente"
@@ -387,12 +389,14 @@ export interface PlanImportacion {
     claveCliente: string;
     clienteIdExistente: string | null;
     poliza: PolizaValida;
+    polizaAnteriorId: string | null;
   }[];
   omitidas: PolizaValida[];
+  renovacionesEnlazadas: number;
 }
 
-function clavePoliza(aseguradora: string, numeroPoliza: string): string {
-  return `${normalizarTexto(aseguradora)}|${normalizarTexto(numeroPoliza)}`;
+function clavePoliza(aseguradora: string, numeroPoliza: string, vigenciaInicio: string): string {
+  return `${normalizarTexto(aseguradora)}|${normalizarTexto(numeroPoliza)}|${normalizarTexto(vigenciaInicio)}`;
 }
 
 /**
@@ -406,17 +410,22 @@ export function planificarImportacion(
 ): PlanImportacion {
   const idPorClave = new Map<string, string>();
   const clavesPoliza = new Set<string>();
+  const polizasActualesPorCliente = new Map<string, Poliza[]>();
+
   for (const { cliente, polizas } of existentes) {
     const clave = normalizarTexto(cliente.nombre);
     if (!idPorClave.has(clave)) idPorClave.set(clave, cliente.id);
     for (const p of polizas) {
-      clavesPoliza.add(clavePoliza(p.aseguradora, p.numeroPoliza));
+      clavesPoliza.add(clavePoliza(p.aseguradora, p.numeroPoliza, p.vigenciaInicio));
     }
+    polizasActualesPorCliente.set(cliente.id, polizasActuales(polizas));
   }
 
   const omitidas: PolizaValida[] = [];
   const polizasPorCrear: PlanImportacion["polizasPorCrear"] = [];
   const nombrePorClaveNueva = new Map<string, string>();
+  const idsReclamados = new Set<string>();
+  let renovacionesEnlazadas = 0;
 
   for (const grupo of grupos) {
     const clave = normalizarTexto(grupo.nombre);
@@ -426,13 +435,41 @@ export function planificarImportacion(
     }
 
     for (const poliza of grupo.polizas) {
-      const claveP = clavePoliza(poliza.aseguradora, poliza.numeroPoliza);
+      const claveP = clavePoliza(poliza.aseguradora, poliza.numeroPoliza, poliza.vigenciaInicio);
       if (clavesPoliza.has(claveP)) {
         omitidas.push(poliza);
         continue;
       }
       clavesPoliza.add(claveP);
-      polizasPorCrear.push({ claveCliente: clave, clienteIdExistente, poliza });
+
+      let polizaAnteriorId: string | null = null;
+
+      // ponytail: limite conocido; dos vigencias de la misma poliza dentro del mismo archivo no se enlazan entre si (se puede enlazar despues con una segunda importacion).
+      if (clienteIdExistente !== null) {
+        const candidatas = (polizasActualesPorCliente.get(clienteIdExistente) ?? []).filter(
+          (p) =>
+            normalizarTexto(p.aseguradora) === normalizarTexto(poliza.aseguradora) &&
+            normalizarTexto(p.numeroPoliza) === normalizarTexto(poliza.numeroPoliza) &&
+            p.vigenciaInicio < poliza.vigenciaInicio,
+        );
+
+        if (candidatas.length > 0) {
+          candidatas.sort((a, b) => b.vigenciaInicio.localeCompare(a.vigenciaInicio));
+          const masReciente = candidatas[0];
+          if (!idsReclamados.has(masReciente.id)) {
+            polizaAnteriorId = masReciente.id;
+            idsReclamados.add(masReciente.id);
+            renovacionesEnlazadas += 1;
+          }
+        }
+      }
+
+      polizasPorCrear.push({
+        claveCliente: clave,
+        clienteIdExistente,
+        poliza,
+        polizaAnteriorId,
+      });
     }
   }
 
@@ -444,5 +481,5 @@ export function planificarImportacion(
     .filter(([clave]) => clavesConPoliza.has(clave))
     .map(([, nombre]) => nombre);
 
-  return { clientesNuevos, polizasPorCrear, omitidas };
+  return { clientesNuevos, polizasPorCrear, omitidas, renovacionesEnlazadas };
 }

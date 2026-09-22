@@ -39,6 +39,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      auditoria: {
+        Row: {
+          accion: string
+          datos_anteriores: Json | null
+          datos_nuevos: Json | null
+          fecha: string
+          id: number
+          registro_id: string
+          tabla: string
+          usuario_id: string | null
+        }
+        Insert: {
+          accion: string
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          fecha?: string
+          id?: never
+          registro_id: string
+          tabla: string
+          usuario_id?: string | null
+        }
+        Update: {
+          accion?: string
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          fecha?: string
+          id?: never
+          registro_id?: string
+          tabla?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           activo_manual: boolean | null
@@ -49,6 +82,7 @@ export type Database = {
           id: string
           nombre: string
           telefono: string
+          updated_at: string
         }
         Insert: {
           activo_manual?: boolean | null
@@ -59,6 +93,7 @@ export type Database = {
           id?: string
           nombre: string
           telefono: string
+          updated_at?: string
         }
         Update: {
           activo_manual?: boolean | null
@@ -69,6 +104,7 @@ export type Database = {
           id?: string
           nombre?: string
           telefono?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -123,8 +159,10 @@ export type Database = {
           numero_cuotas: number | null
           numero_poliza: string
           observaciones: string
+          poliza_anterior_id: string | null
           prima: number
           tipo_seguro: string
+          updated_at: string
           vigencia_fin: string
           vigencia_inicio: string
         }
@@ -143,8 +181,10 @@ export type Database = {
           numero_cuotas?: number | null
           numero_poliza: string
           observaciones?: string
+          poliza_anterior_id?: string | null
           prima?: number
           tipo_seguro: string
+          updated_at?: string
           vigencia_fin: string
           vigencia_inicio: string
         }
@@ -163,8 +203,10 @@ export type Database = {
           numero_cuotas?: number | null
           numero_poliza?: string
           observaciones?: string
+          poliza_anterior_id?: string | null
           prima?: number
           tipo_seguro?: string
+          updated_at?: string
           vigencia_fin?: string
           vigencia_inicio?: string
         }
@@ -174,6 +216,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polizas_poliza_anterior_id_fkey"
+            columns: ["poliza_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "polizas"
             referencedColumns: ["id"]
           },
         ]

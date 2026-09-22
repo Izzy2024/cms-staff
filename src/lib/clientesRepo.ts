@@ -23,6 +23,7 @@ function filaAPoliza(fila: {
   conducto_pago?: string | null;
   dia_pago?: string | null;
   numero_cuotas?: number | null;
+  poliza_anterior_id?: string | null;
 }): Poliza {
   return {
     id: fila.id,
@@ -42,9 +43,11 @@ function filaAPoliza(fila: {
     conductoPago: (fila.conducto_pago as Poliza["conductoPago"]) || undefined,
     diaPago: fila.dia_pago ?? undefined,
     numeroCuotas: fila.numero_cuotas ?? undefined,
+    polizaAnteriorId: fila.poliza_anterior_id ?? undefined,
   };
 }
 
+// poliza_anterior_id no se incluye aqui porque updatePoliza usa esta funcion y no debe desenlazar una vigencia al editarla.
 function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
   return {
     aseguradora: data.aseguradora,
@@ -161,10 +164,15 @@ export async function listPolizas(clienteId: string): Promise<Poliza[]> {
 export async function createPoliza(
   clienteId: string,
   data: Omit<Poliza, "id" | "clienteId">,
+  polizaAnteriorId?: string,
 ): Promise<string> {
   const { data: fila, error } = await supabase
     .from("polizas")
-    .insert({ ...polizaAFila(data), cliente_id: clienteId })
+    .insert({
+      ...polizaAFila(data),
+      cliente_id: clienteId,
+      poliza_anterior_id: polizaAnteriorId ?? null,
+    })
     .select("id")
     .single();
   if (error) throw error;
@@ -215,12 +223,13 @@ export async function createClientes(
 }
 
 export async function createPolizas(
-  lista: { clienteId: string; datos: Omit<Poliza, "id" | "clienteId"> }[],
+  lista: { clienteId: string; datos: Omit<Poliza, "id" | "clienteId">; polizaAnteriorId?: string }[],
 ): Promise<void> {
   for (let i = 0; i < lista.length; i += 500) {
-    const bloque = lista.slice(i, i + 500).map(({ clienteId, datos }) => ({
+    const bloque = lista.slice(i, i + 500).map(({ clienteId, datos, polizaAnteriorId }) => ({
       ...polizaAFila(datos),
       cliente_id: clienteId,
+      poliza_anterior_id: polizaAnteriorId ?? null,
     }));
     const { error } = await supabase.from("polizas").insert(bloque);
     if (error) throw error;
