@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Suspense, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   CalendarClock,
   LogOut,
@@ -13,6 +13,8 @@ import {
 import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { Button } from "./ui/button.tsx";
+import { Cargando } from "./Cargando.tsx";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { cn } from "../lib/utils.ts";
 
 const ENLACES = [
@@ -35,6 +37,7 @@ function clasesEnlace(isActive: boolean, tamano: string): string {
 export function Layout() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   async function handleLogout(): Promise<void> {
@@ -153,7 +156,11 @@ export function Layout() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
-        <Outlet />
+        <ErrorBoundary key={location.pathname}>
+          <Suspense fallback={<Cargando mensaje="Cargando…" />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       <footer className="border-t border-border/60 bg-background/50 py-4 text-center text-xs text-muted-foreground">
