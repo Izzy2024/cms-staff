@@ -90,6 +90,11 @@ function parseFechaDmy(fechaStr: string): string | null {
     return null;
   }
 
+  const fecha = new Date(anio, mes - 1, dia);
+  if (fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
+    return null;
+  }
+
   return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
