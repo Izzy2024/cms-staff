@@ -83,6 +83,7 @@ export interface Poliza {
   conductoPago?: ConductoPago;
   diaPago?: string;
   numeroCuotas?: number;
+  polizaAnteriorId?: string;
 }
 
 export interface DocumentoPoliza {
