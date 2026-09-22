@@ -1,6 +1,7 @@
 import { supabase } from "./supabase.ts";
 import { BUCKET } from "./documentosRepo.ts";
 import type { Cliente, Poliza } from "./types.ts";
+import type { Tables } from "./database.types.ts";
 
 export type ClienteConPolizas = { cliente: Cliente; polizas: Poliza[] };
 
@@ -67,10 +68,10 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
 const PAGINA = 1000;
 
 // ponytail: asume el max-rows por defecto de Supabase (1000); si se baja en el dashboard, bajar PAGINA.
-async function traerTodasLasFilas(tabla: "clientes" | "polizas") {
+async function traerTodasLasFilas<T extends "clientes" | "polizas">(tabla: T): Promise<Tables<T>[]> {
   const primera = await supabase.from(tabla).select("*").order("id").range(0, PAGINA - 1);
   if (primera.error) throw primera.error;
-  const filas = [...(primera.data ?? [])];
+  const filas = [...((primera.data ?? []) as Tables<T>[])];
   for (let desde = PAGINA; filas.length === desde; desde += PAGINA) {
     const { data, error } = await supabase
       .from(tabla)
@@ -78,7 +79,7 @@ async function traerTodasLasFilas(tabla: "clientes" | "polizas") {
       .order("id")
       .range(desde, desde + PAGINA - 1);
     if (error) throw error;
-    filas.push(...(data ?? []));
+    filas.push(...((data ?? []) as Tables<T>[]));
   }
   return filas;
 }

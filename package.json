@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "gen:types": "supabase gen types typescript --linked > src/lib/database.types.ts",
     "test": "vitest run",
     "preview": "vite preview"
   },

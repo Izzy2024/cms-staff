@@ -72,7 +72,7 @@ export async function subirDocumento(
   return {
     id: fila.id,
     nombreArchivo: fila.nombre_archivo,
-    tipoDocumento: fila.tipo_documento,
+    tipoDocumento: fila.tipo_documento as TipoDocumento,
     urlStorage: await urlFirmada(fila.storage_path),
     fechaSubida: fila.fecha_subida,
   };
