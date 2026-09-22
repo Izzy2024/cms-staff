@@ -167,6 +167,8 @@ export function ClienteDetailPage() {
       if (email) payload.email = email;
       if (esNuevo) {
         const nuevoId = await createCliente(payload);
+        // ponytail: el estado sobrevive al navigate() porque /clientes/nuevo y /clientes/:id renderizan la misma instancia de ClienteDetailPage; si algun dia se le pone key a la ruta, pasar la extraccion por navigate state.
+        if (extraccionPoliza) setMostrarFormPoliza(true);
         navigate(`/clientes/${nuevoId}`, { replace: true });
       } else if (clienteId) {
         await updateCliente(clienteId, payload);
