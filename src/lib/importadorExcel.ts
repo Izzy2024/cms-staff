@@ -1,4 +1,5 @@
 import readXlsxFile from "read-excel-file/browser";
+import type { ClienteConPolizas } from "./clientesRepo.ts";
 
 export type CampoSistema =
   | "cliente"
@@ -66,11 +67,12 @@ export interface ResultadoProcesamiento {
   errores: ErrorFilaImportacion[];
 }
 
-function normalizarTexto(texto: string): string {
+export function normalizarTexto(texto: string): string {
   return texto
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -87,6 +89,11 @@ function parseFechaDmy(fechaStr: string): string | null {
   const anio = parseInt(match[3], 10);
 
   if (dia < 1 || dia > 31 || mes < 1 || mes > 12 || anio < 1900 || anio > 2100) {
+    return null;
+  }
+
+  const fecha = new Date(anio, mes - 1, dia);
+  if (fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) {
     return null;
   }
 
@@ -123,13 +130,25 @@ export function parsePrima(valor: unknown): number {
     return Number.isFinite(valor) ? Math.max(0, valor) : 0;
   }
   if (!valor) return 0;
-  let str = String(valor).trim().replace(/[^0-9.,-]/g, "");
+  let str = String(valor)
+    .trim()
+    .replace(/[^0-9.,-]/g, "")
+    .replace(/^[.,]+|[.,]+$/g, "");
   if (!str) return 0;
-  if (str.includes(",") && str.includes(".")) {
-    str = str.replace(/,/g, "");
-  } else if (str.includes(",")) {
-    str = str.replace(",", ".");
+
+  const tieneComa = str.includes(",");
+  const tienePunto = str.includes(".");
+
+  if (tieneComa && tienePunto) {
+    const decimal = str.lastIndexOf(",") > str.lastIndexOf(".") ? "," : ".";
+    const miles = decimal === "," ? "." : ",";
+    str = str.split(miles).join("").replace(decimal, ".");
+  } else if (tieneComa) {
+    str = /^\d{1,3}(,\d{3})+$/.test(str) ? str.replace(/,/g, "") : str.replace(",", ".");
+  } else if (tienePunto) {
+    str = /^\d{1,3}(\.\d{3}){2,}$/.test(str) ? str.replace(/\./g, "") : str;
   }
+
   const parsed = parseFloat(str);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
@@ -360,4 +379,70 @@ export function procesarFilas(
     clientesAgrupados,
     errores,
   };
+}
+
+export interface PlanImportacion {
+  clientesNuevos: string[];
+  polizasPorCrear: {
+    claveCliente: string;
+    clienteIdExistente: string | null;
+    poliza: PolizaValida;
+  }[];
+  omitidas: PolizaValida[];
+}
+
+function clavePoliza(aseguradora: string, numeroPoliza: string): string {
+  return `${normalizarTexto(aseguradora)}|${normalizarTexto(numeroPoliza)}`;
+}
+
+/**
+ * Planifica la importación de forma idempotente: reutiliza clientes existentes por nombre
+ * normalizado, fusiona grupos homónimos del archivo en un solo cliente nuevo (conserva el
+ * primer nombre) y omite las pólizas ya presentes en la base o repetidas en el archivo.
+ */
+export function planificarImportacion(
+  grupos: ClienteAgrupado[],
+  existentes: ClienteConPolizas[],
+): PlanImportacion {
+  const idPorClave = new Map<string, string>();
+  const clavesPoliza = new Set<string>();
+  for (const { cliente, polizas } of existentes) {
+    const clave = normalizarTexto(cliente.nombre);
+    if (!idPorClave.has(clave)) idPorClave.set(clave, cliente.id);
+    for (const p of polizas) {
+      clavesPoliza.add(clavePoliza(p.aseguradora, p.numeroPoliza));
+    }
+  }
+
+  const omitidas: PolizaValida[] = [];
+  const polizasPorCrear: PlanImportacion["polizasPorCrear"] = [];
+  const nombrePorClaveNueva = new Map<string, string>();
+
+  for (const grupo of grupos) {
+    const clave = normalizarTexto(grupo.nombre);
+    const clienteIdExistente = idPorClave.get(clave) ?? null;
+    if (clienteIdExistente === null && !nombrePorClaveNueva.has(clave)) {
+      nombrePorClaveNueva.set(clave, grupo.nombre);
+    }
+
+    for (const poliza of grupo.polizas) {
+      const claveP = clavePoliza(poliza.aseguradora, poliza.numeroPoliza);
+      if (clavesPoliza.has(claveP)) {
+        omitidas.push(poliza);
+        continue;
+      }
+      clavesPoliza.add(claveP);
+      polizasPorCrear.push({ claveCliente: clave, clienteIdExistente, poliza });
+    }
+  }
+
+  // Un cliente nuevo cuyas pólizas quedaron TODAS omitidas no se crea.
+  const clavesConPoliza = new Set(
+    polizasPorCrear.filter((a) => a.clienteIdExistente === null).map((a) => a.claveCliente),
+  );
+  const clientesNuevos = [...nombrePorClaveNueva.entries()]
+    .filter(([clave]) => clavesConPoliza.has(clave))
+    .map(([, nombre]) => nombre);
+
+  return { clientesNuevos, polizasPorCrear, omitidas };
 }

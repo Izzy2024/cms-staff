@@ -167,6 +167,8 @@ export function ClienteDetailPage() {
       if (email) payload.email = email;
       if (esNuevo) {
         const nuevoId = await createCliente(payload);
+        // ponytail: el estado sobrevive al navigate() porque /clientes/nuevo y /clientes/:id renderizan la misma instancia de ClienteDetailPage; si algun dia se le pone key a la ruta, pasar la extraccion por navigate state.
+        if (extraccionPoliza) setMostrarFormPoliza(true);
         navigate(`/clientes/${nuevoId}`, { replace: true });
       } else if (clienteId) {
         await updateCliente(clienteId, payload);
@@ -176,6 +178,22 @@ export function ClienteDetailPage() {
     } finally {
       setGuardando(false);
     }
+  }
+
+  function abrirFormularioPoliza(poliza: Poliza | null): void {
+    setPolizaEditando(poliza);
+    setPolizaRenovando(null);
+    setExtraccionPoliza(null);
+    setArchivoPolizaExtraida(null);
+    setMostrarFormPoliza(true);
+  }
+
+  function cerrarFormularioPoliza(): void {
+    setMostrarFormPoliza(false);
+    setPolizaEditando(null);
+    setPolizaRenovando(null);
+    setExtraccionPoliza(null);
+    setArchivoPolizaExtraida(null);
   }
 
   async function handleGuardarPoliza(valores: PolizaFormValues): Promise<void> {
@@ -192,9 +210,6 @@ export function ClienteDetailPage() {
           );
         }
       }
-      setExtraccionPoliza(null);
-      setArchivoPolizaExtraida(null);
-      setPolizaRenovando(null);
     } else {
       const nuevaPolizaId = await createPoliza(clienteId, valores);
       if (archivoPolizaExtraida) {
@@ -206,15 +221,10 @@ export function ClienteDetailPage() {
           );
         }
       }
-      setExtraccionPoliza(null);
-      setArchivoPolizaExtraida(null);
-      setPolizaRenovando(null);
     }
     const listaPolizas = await listPolizas(clienteId);
     setPolizas(listaPolizas);
-    setMostrarFormPoliza(false);
-    setPolizaEditando(null);
-    setPolizaRenovando(null);
+    cerrarFormularioPoliza();
   }
 
   function handleExtraccionNuevoCliente(resultado: ResultadoExtraccion, archivo: File): void {
@@ -404,14 +414,7 @@ export function ClienteDetailPage() {
             </div>
 
             {!mostrarFormPoliza ? (
-              <Button
-                onClick={() => {
-                  setPolizaEditando(null);
-                  setPolizaRenovando(null);
-                  setExtraccionPoliza(null);
-                  setMostrarFormPoliza(true);
-                }}
-              >
+              <Button onClick={() => abrirFormularioPoliza(null)}>
                 <Plus className="size-4" aria-hidden="true" />
                 Agregar póliza
               </Button>
@@ -455,12 +458,7 @@ export function ClienteDetailPage() {
                 inicial={extraccionPoliza ?? polizaEditando ?? undefined}
                 esEdicion={Boolean(polizaEditando)}
                 onGuardar={handleGuardarPoliza}
-                onCancelar={() => {
-                  setMostrarFormPoliza(false);
-                  setPolizaEditando(null);
-                  setPolizaRenovando(null);
-                  setExtraccionPoliza(null);
-                }}
+                onCancelar={cerrarFormularioPoliza}
               />
             </div>
           ) : null}
@@ -471,14 +469,7 @@ export function ClienteDetailPage() {
               titulo="Este cliente todavía no tiene pólizas"
               descripcion="Registre la primera póliza para comenzar a gestionar sus renovaciones y documentos."
               accion={
-                <Button
-                  onClick={() => {
-                    setPolizaEditando(null);
-                    setPolizaRenovando(null);
-                    setExtraccionPoliza(null);
-                    setMostrarFormPoliza(true);
-                  }}
-                >
+                <Button onClick={() => abrirFormularioPoliza(null)}>
                   <Plus className="size-4" aria-hidden="true" />
                   Agregar póliza
                 </Button>
@@ -507,16 +498,7 @@ export function ClienteDetailPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setPolizaEditando(p);
-                        setPolizaRenovando(null);
-                        setExtraccionPoliza(null);
-                        setMostrarFormPoliza(true);
-                      }}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => abrirFormularioPoliza(p)}>
                       <Pencil className="size-3.5" aria-hidden="true" />
                       Editar
                     </Button>

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.ts";
+import { BUCKET } from "./documentosRepo.ts";
 import type { Cliente, Poliza } from "./types.ts";
 
 export type ClienteConPolizas = { cliente: Cliente; polizas: Poliza[] };
@@ -63,14 +64,30 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
   };
 }
 
+const PAGINA = 1000;
+
+// ponytail: asume el max-rows por defecto de Supabase (1000); si se baja en el dashboard, bajar PAGINA.
+async function traerTodasLasFilas(tabla: "clientes" | "polizas") {
+  const primera = await supabase.from(tabla).select("*").order("id").range(0, PAGINA - 1);
+  if (primera.error) throw primera.error;
+  const filas = [...(primera.data ?? [])];
+  for (let desde = PAGINA; filas.length === desde; desde += PAGINA) {
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("*")
+      .order("id")
+      .range(desde, desde + PAGINA - 1);
+    if (error) throw error;
+    filas.push(...(data ?? []));
+  }
+  return filas;
+}
+
 export async function listClientesConPolizas(): Promise<ClienteConPolizas[]> {
-  const [{ data: clientes, error: errorClientes }, { data: polizas, error: errorPolizas }] =
-    await Promise.all([
-      supabase.from("clientes").select("*"),
-      supabase.from("polizas").select("*"),
-    ]);
-  if (errorClientes) throw errorClientes;
-  if (errorPolizas) throw errorPolizas;
+  const [clientes, polizas] = await Promise.all([
+    traerTodasLasFilas("clientes"),
+    traerTodasLasFilas("polizas"),
+  ]);
 
   const polizasPorCliente = new Map<string, Poliza[]>();
   for (const fila of polizas ?? []) {
@@ -167,6 +184,44 @@ export async function updatePoliza(
 }
 
 export async function deletePoliza(clienteId: string, polizaId: string): Promise<void> {
+  const { data: documentos, error: errorDocumentos } = await supabase
+    .from("documentos_poliza")
+    .select("storage_path")
+    .eq("poliza_id", polizaId);
+  if (errorDocumentos) throw errorDocumentos;
+
   const { error } = await supabase.from("polizas").delete().eq("id", polizaId).eq("cliente_id", clienteId);
   if (error) throw error;
+
+  const rutas = (documentos ?? []).map((fila) => fila.storage_path);
+  if (rutas.length > 0) {
+    await supabase.storage.from(BUCKET).remove(rutas).catch(() => undefined);
+  }
+}
+
+export async function createClientes(
+  lista: Omit<Cliente, "id">[],
+): Promise<{ id: string; nombre: string }[]> {
+  if (lista.length === 0) return [];
+  const filas = lista.map(({ activoManual, fechaNacimiento, ...resto }) => ({
+    ...resto,
+    fecha_nacimiento: fechaNacimiento || null,
+    activo_manual: activoManual,
+  }));
+  const { data, error } = await supabase.from("clientes").insert(filas).select("id, nombre");
+  if (error) throw error;
+  return (data ?? []).map((fila) => ({ id: fila.id, nombre: fila.nombre }));
+}
+
+export async function createPolizas(
+  lista: { clienteId: string; datos: Omit<Poliza, "id" | "clienteId"> }[],
+): Promise<void> {
+  for (let i = 0; i < lista.length; i += 500) {
+    const bloque = lista.slice(i, i + 500).map(({ clienteId, datos }) => ({
+      ...polizaAFila(datos),
+      cliente_id: clienteId,
+    }));
+    const { error } = await supabase.from("polizas").insert(bloque);
+    if (error) throw error;
+  }
 }

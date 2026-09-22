@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
-import { CheckCircle2, Mail, Save, User as UserIcon, Shield } from "lucide-react";
+import { CheckCircle2, KeyRound, Mail, Save, User as UserIcon, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.tsx";
 import { supabase } from "../lib/supabase.ts";
 import { Button } from "../components/ui/button.tsx";
@@ -137,7 +138,11 @@ export function PerfilPage() {
           </div>
         ) : null}
 
-        <div className="mt-6 flex items-center justify-end border-t border-border/60 pt-4">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+          <Button variant="outline" nativeButton={false} render={<Link to="/definir-contrasena" />}>
+            <KeyRound className="size-4" aria-hidden="true" />
+            Cambiar contraseña
+          </Button>
           <Button type="submit" disabled={guardando}>
             <Save className="size-4" aria-hidden="true" />
             {guardando ? "Guardando…" : "Guardar cambios"}

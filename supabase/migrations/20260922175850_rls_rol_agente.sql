@@ -32,4 +32,4 @@ create policy "agente_all_storage_documentos" on storage.objects
 update storage.buckets
   set file_size_limit = 10485760,
       allowed_mime_types = '{application/pdf,image/jpeg,image/png}'
-  where id = 'documentos';
+  where id = 'documentos';;
