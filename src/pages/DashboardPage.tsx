@@ -8,6 +8,7 @@ import {
   Calendar,
   Car,
   ChevronRight,
+  Download,
   FileCheck,
   FileSpreadsheet,
   FileText,
@@ -35,6 +36,7 @@ import {
   textoDiasRestantes,
 } from "../lib/renovaciones.ts";
 import type { ItemRenovacion } from "../lib/renovaciones.ts";
+import { descargarExcel, filasRenovaciones } from "../lib/exportarExcel.ts";
 import { cn } from "../lib/utils.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Cargando } from "../components/Cargando.tsx";
@@ -77,6 +79,8 @@ export function DashboardPage() {
   const [clientesConPolizas, setClientesConPolizas] = useState<ClienteConPolizas[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exportando, setExportando] = useState(false);
+  const [errorExportar, setErrorExportar] = useState("");
 
   useEffect(() => {
     listClientesConPolizas()
@@ -90,6 +94,20 @@ export function DashboardPage() {
   const renovaciones: ItemRenovacion[] = useMemo(() => {
     return obtenerRenovacionesProximas(clientesConPolizas);
   }, [clientesConPolizas]);
+
+  async function handleExportar(): Promise<void> {
+    try {
+      setExportando(true);
+      setErrorExportar("");
+      const filas = filasRenovaciones(renovaciones, clientesConPolizas);
+      const hoy = new Date().toISOString().slice(0, 10);
+      await descargarExcel(filas, `renovaciones-${hoy}.xlsx`);
+    } catch {
+      setErrorExportar("No se pudo generar el archivo de Excel. Intente de nuevo.");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   const clientesActivos = useMemo(
     () => contarClientesActivos(clientesConPolizas),
@@ -128,6 +146,15 @@ export function DashboardPage() {
 
         {!loading && !error && renovaciones.length > 0 ? (
           <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exportando}
+              onClick={() => void handleExportar()}
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              {exportando ? "Exportando…" : "Exportar"}
+            </Button>
             <Badge variant="warning" className="px-3 py-1 text-sm font-semibold">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {renovaciones.length} {renovaciones.length === 1 ? "póliza por vencer" : "pólizas por vencer"}
@@ -135,6 +162,8 @@ export function DashboardPage() {
           </div>
         ) : null}
       </div>
+
+      {errorExportar ? <MensajeError>{errorExportar}</MensajeError> : null}
 
       {loading ? <Cargando mensaje="Cargando renovaciones…" /> : null}
 

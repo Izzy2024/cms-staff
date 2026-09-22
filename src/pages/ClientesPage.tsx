@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, FileSpreadsheet, IdCard, Mail, Phone, Pin, Plus, Search, Users, X } from "lucide-react";
+import { ChevronRight, Download, FileSpreadsheet, IdCard, Mail, Phone, Pin, Plus, Search, Users, X } from "lucide-react";
 import { actualizarEstadoManual, listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
 import { esClienteActivo, estadoClientePorFechas, polizasActuales } from "../lib/renovaciones.ts";
+import { descargarExcel, filasCartera } from "../lib/exportarExcel.ts";
 import { cn } from "../lib/utils.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -52,6 +53,8 @@ export function ClientesPage() {
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>("activos");
   const [errorEstado, setErrorEstado] = useState("");
+  const [exportando, setExportando] = useState(false);
+  const [errorExportar, setErrorExportar] = useState("");
 
   useEffect(() => {
     listClientesConPolizas()
@@ -111,6 +114,24 @@ export function ClientesPage() {
     }
   }
 
+  async function handleExportar(): Promise<void> {
+    if (visibles.length === 0 || exportando) return;
+    setErrorExportar("");
+    setExportando(true);
+    try {
+      const filas = filasCartera(visibles.map((v) => v.item));
+      const hoy = new Date();
+      const anio = hoy.getFullYear();
+      const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+      const dia = String(hoy.getDate()).padStart(2, "0");
+      await descargarExcel(filas, `cartera-${anio}-${mes}-${dia}.xlsx`);
+    } catch {
+      setErrorExportar("No se pudo generar el archivo de Excel. Intente de nuevo.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
   return (
     <section className="space-y-6">
       {/* Encabezado */}
@@ -130,6 +151,14 @@ export function ClientesPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            disabled={visibles.length === 0 || exportando}
+            onClick={() => void handleExportar()}
+          >
+            <Download className="size-4" aria-hidden="true" />
+            {exportando ? "Exportando…" : "Exportar Excel"}
+          </Button>
           <Button variant="outline" nativeButton={false} render={<Link to="/importar" />}>
             <FileSpreadsheet className="size-4" aria-hidden="true" />
             Importar Excel
@@ -209,6 +238,7 @@ export function ClientesPage() {
       {loading ? <Cargando mensaje="Cargando clientes…" /> : null}
 
       {error ? <MensajeError>{error}</MensajeError> : null}
+      {errorExportar ? <MensajeError>{errorExportar}</MensajeError> : null}
 
       {/* Estado vacío cuando no hay clientes registrados */}
       {!loading && !error && items.length === 0 ? (
