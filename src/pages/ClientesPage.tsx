@@ -271,10 +271,9 @@ export function ClientesPage() {
               ? `Estado manual ${activo ? "activo" : "inactivo"}. Click para cambiar o volver a automático.`
               : "Click para forzar/quitar el estado manual.";
             return (
-              <Link
+              <div
                 key={cliente.id}
-                to={`/clientes/${cliente.id}`}
-                className="group block rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-foreground/30 hover:shadow-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:p-5"
+                className="group relative block rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:border-foreground/30 hover:shadow-xs focus-within:ring-2 focus-within:ring-ring sm:p-5"
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   {/* Avatar + Datos principales */}
@@ -289,7 +288,12 @@ export function ClientesPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-base font-semibold tracking-tight text-foreground group-hover:text-primary sm:text-lg">
-                          {cliente.nombre}
+                          <Link
+                            to={`/clientes/${cliente.id}`}
+                            className="after:absolute after:inset-0 focus-visible:outline-none"
+                          >
+                            {cliente.nombre}
+                          </Link>
                         </h2>
                         {cliente.cedula && (
                           <Badge variant="outline" className="font-mono text-xs">
@@ -301,13 +305,11 @@ export function ClientesPage() {
                           type="button"
                           title={tituloEstado}
                           aria-label={tituloEstado}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          onClick={() => {
                             void alternarEstadoManual({ cliente, polizas }, activo);
                           }}
                           className={cn(
-                            "inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs font-medium transition-colors",
+                            "relative z-10 inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border px-2 text-xs font-medium transition-colors",
                             activo
                               ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
                               : "border-border bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground",
@@ -372,9 +374,9 @@ export function ClientesPage() {
                         </li>
                       ))}
                       {polizas.length > 3 && (
-                        <p className="text-right text-xs text-muted-foreground">
+                        <li className="text-right text-xs text-muted-foreground">
                           +{polizas.length - 3} póliza(s) más…
-                        </p>
+                        </li>
                       )}
                     </ul>
                   </div>
@@ -383,7 +385,7 @@ export function ClientesPage() {
                     Sin pólizas registradas en el sistema.
                   </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </div>
