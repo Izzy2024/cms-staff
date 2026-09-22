@@ -71,6 +71,7 @@ export function ImportarPage() {
   const [errorImportacion, setErrorImportacion] = useState("");
   const [polizasImportadas, setPolizasImportadas] = useState(0);
   const [polizasOmitidas, setPolizasOmitidas] = useState(0);
+  const [renovacionesEnlazadas, setRenovacionesEnlazadas] = useState(0);
 
   async function handleArchivoSeleccionado(
     event: ChangeEvent<HTMLInputElement>,
@@ -159,7 +160,7 @@ export function ImportarPage() {
       }
 
       await createPolizas(
-        plan.polizasPorCrear.map(({ claveCliente, clienteIdExistente, poliza }) => ({
+        plan.polizasPorCrear.map(({ claveCliente, clienteIdExistente, poliza, polizaAnteriorId }) => ({
           clienteId: clienteIdExistente ?? idPorClave.get(claveCliente) ?? "",
           datos: {
             aseguradora: poliza.aseguradora,
@@ -172,11 +173,13 @@ export function ImportarPage() {
             observaciones: poliza.observaciones,
             beneficios: "",
           },
+          polizaAnteriorId: polizaAnteriorId ?? undefined,
         })),
       );
 
       setPolizasImportadas(plan.polizasPorCrear.length);
       setPolizasOmitidas(plan.omitidas.length);
+      setRenovacionesEnlazadas(plan.renovacionesEnlazadas);
       setPaso("resultado");
     } catch {
       setErrorImportacion(
@@ -197,6 +200,7 @@ export function ImportarPage() {
     setErrorImportacion("");
     setPolizasImportadas(0);
     setPolizasOmitidas(0);
+    setRenovacionesEnlazadas(0);
   }
 
   const indexPasoActual = PASOS.findIndex((p) => p.id === paso);
@@ -579,6 +583,14 @@ export function ImportarPage() {
               {polizasOmitidas === 1
                 ? "1 póliza omitida porque ya existía"
                 : `${polizasOmitidas} pólizas omitidas porque ya existían`}
+            </p>
+          ) : null}
+
+          {renovacionesEnlazadas > 0 ? (
+            <p className="mt-1 text-lg font-semibold text-muted-foreground">
+              {renovacionesEnlazadas === 1
+                ? "1 renovación enlazada a su póliza anterior"
+                : `${renovacionesEnlazadas} renovaciones enlazadas a su póliza anterior`}
             </p>
           ) : null}
 
