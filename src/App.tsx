@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
+import { DefinirContrasenaPage } from "./pages/DefinirContrasenaPage.tsx";
 import { DashboardPage } from "./pages/DashboardPage.tsx";
 import { ClientesPage } from "./pages/ClientesPage.tsx";
 import { ClienteDetailPage } from "./pages/ClienteDetailPage.tsx";
@@ -15,6 +16,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/definir-contrasena" element={<DefinirContrasenaPage />} />
           <Route
             element={
               <ProtectedRoute>
