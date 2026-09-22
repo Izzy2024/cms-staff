@@ -198,3 +198,30 @@ export async function deletePoliza(clienteId: string, polizaId: string): Promise
     await supabase.storage.from(BUCKET).remove(rutas).catch(() => undefined);
   }
 }
+
+export async function createClientes(
+  lista: Omit<Cliente, "id">[],
+): Promise<{ id: string; nombre: string }[]> {
+  if (lista.length === 0) return [];
+  const filas = lista.map(({ activoManual, fechaNacimiento, ...resto }) => ({
+    ...resto,
+    fecha_nacimiento: fechaNacimiento || null,
+    activo_manual: activoManual,
+  }));
+  const { data, error } = await supabase.from("clientes").insert(filas).select("id, nombre");
+  if (error) throw error;
+  return (data ?? []).map((fila) => ({ id: fila.id, nombre: fila.nombre }));
+}
+
+export async function createPolizas(
+  lista: { clienteId: string; datos: Omit<Poliza, "id" | "clienteId"> }[],
+): Promise<void> {
+  for (let i = 0; i < lista.length; i += 500) {
+    const bloque = lista.slice(i, i + 500).map(({ clienteId, datos }) => ({
+      ...polizaAFila(datos),
+      cliente_id: clienteId,
+    }));
+    const { error } = await supabase.from("polizas").insert(bloque);
+    if (error) throw error;
+  }
+}

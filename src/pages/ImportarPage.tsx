@@ -17,11 +17,13 @@ import {
 import { Button } from "../components/ui/button.tsx";
 import { Badge } from "../components/ui/badge.tsx";
 import { MensajeError } from "../components/MensajeError.tsx";
-import { createCliente, createPoliza } from "../lib/clientesRepo.ts";
+import { createClientes, createPolizas, listClientesConPolizas } from "../lib/clientesRepo.ts";
 import {
   CAMPOS_SISTEMA,
   detectarMapeoColumnas,
   leerArchivoExcel,
+  normalizarTexto,
+  planificarImportacion,
   procesarFilas,
 } from "../lib/importadorExcel.ts";
 import type {
@@ -68,6 +70,7 @@ export function ImportarPage() {
   const [importando, setImportando] = useState(false);
   const [errorImportacion, setErrorImportacion] = useState("");
   const [polizasImportadas, setPolizasImportadas] = useState(0);
+  const [polizasOmitidas, setPolizasOmitidas] = useState(0);
 
   async function handleArchivoSeleccionado(
     event: ChangeEvent<HTMLInputElement>,
@@ -136,33 +139,44 @@ export function ImportarPage() {
 
     setImportando(true);
     setErrorImportacion("");
-    let importadas = 0;
 
     try {
-      for (const grupo of resultado.clientesAgrupados) {
-        const clienteId = await createCliente({
-          nombre: grupo.nombre,
-          cedula: "",
-          telefono: "",
-        });
+      // ponytail: importación idempotente; si falla a mitad y se reintenta, lo ya creado se reutiliza u omite en vez de duplicarse.
+      const existentes = await listClientesConPolizas();
+      const plan = planificarImportacion(resultado.clientesAgrupados, existentes);
 
-        for (const p of grupo.polizas) {
-          await createPoliza(clienteId, {
-            aseguradora: p.aseguradora,
-            tipoSeguro: "Otro",
-            detalleBien: p.tipoProductoTexto,
-            numeroPoliza: p.numeroPoliza,
-            vigenciaInicio: p.vigenciaInicio,
-            vigenciaFin: p.vigenciaFin,
-            prima: p.prima,
-            observaciones: p.observaciones,
-            beneficios: "",
-          });
-          importadas++;
-        }
+      const creados = await createClientes(
+        plan.clientesNuevos.map((nombre) => ({ nombre, cedula: "", telefono: "" })),
+      );
+
+      const idPorClave = new Map<string, string>();
+      for (const { cliente } of existentes) {
+        const clave = normalizarTexto(cliente.nombre);
+        if (!idPorClave.has(clave)) idPorClave.set(clave, cliente.id);
+      }
+      for (const { id, nombre } of creados) {
+        idPorClave.set(normalizarTexto(nombre), id);
       }
 
-      setPolizasImportadas(importadas);
+      await createPolizas(
+        plan.polizasPorCrear.map(({ claveCliente, clienteIdExistente, poliza }) => ({
+          clienteId: clienteIdExistente ?? idPorClave.get(claveCliente) ?? "",
+          datos: {
+            aseguradora: poliza.aseguradora,
+            tipoSeguro: "Otro" as const,
+            detalleBien: poliza.tipoProductoTexto,
+            numeroPoliza: poliza.numeroPoliza,
+            vigenciaInicio: poliza.vigenciaInicio,
+            vigenciaFin: poliza.vigenciaFin,
+            prima: poliza.prima,
+            observaciones: poliza.observaciones,
+            beneficios: "",
+          },
+        })),
+      );
+
+      setPolizasImportadas(plan.polizasPorCrear.length);
+      setPolizasOmitidas(plan.omitidas.length);
       setPaso("resultado");
     } catch {
       setErrorImportacion(
@@ -182,6 +196,7 @@ export function ImportarPage() {
     setErrorLectura("");
     setErrorImportacion("");
     setPolizasImportadas(0);
+    setPolizasOmitidas(0);
   }
 
   const indexPasoActual = PASOS.findIndex((p) => p.id === paso);
@@ -558,6 +573,12 @@ export function ImportarPage() {
             {polizasImportadas} pólizas registradas · {resultado.clientesAgrupados.length} clientes
             creados
           </p>
+
+          {polizasOmitidas > 0 ? (
+            <p className="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-300">
+              {polizasOmitidas} pólizas omitidas porque ya existían
+            </p>
+          ) : null}
 
           <p className="mx-auto mt-3 max-w-lg text-sm text-foreground/80">
             Los clientes y sus respectivas pólizas fueron creados correctamente en el sistema. Ya
