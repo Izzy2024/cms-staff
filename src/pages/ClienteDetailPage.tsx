@@ -30,7 +30,7 @@ import { subirDocumento } from "../lib/documentosRepo.ts";
 import { TIPOS_SEGURO } from "../lib/types.ts";
 import type { Cliente, Poliza, TipoSeguro, CoberturaAuto, FrecuenciaPago, ConductoPago } from "../lib/types.ts";
 import type { ResultadoExtraccion } from "../lib/extraccionPoliza.ts";
-import { calcularDiasRestantes } from "../lib/renovaciones.ts";
+import { calcularDiasRestantes, historialDe, polizasActuales } from "../lib/renovaciones.ts";
 import { PolizaForm } from "../components/PolizaForm.tsx";
 import type { PolizaFormValues } from "../components/PolizaForm.tsx";
 import { SubirPolizaIA } from "../components/SubirPolizaIA.tsx";
@@ -59,7 +59,7 @@ function buscarPolizaCandidataRenovacion(
   polizasExistentes: Poliza[],
   extraida: PolizaFormValues,
 ): Poliza | null {
-  const candidatas = polizasExistentes.filter((p) => {
+  const candidatas = polizasActuales(polizasExistentes).filter((p) => {
     const dias = calcularDiasRestantes(p.vigenciaFin);
     return dias !== null && dias <= 30;
   });
@@ -199,7 +199,18 @@ export function ClienteDetailPage() {
   async function handleGuardarPoliza(valores: PolizaFormValues): Promise<void> {
     if (!clienteId || esNuevo) return;
     setError("");
-    if (polizaEditando) {
+    if (polizaRenovando) {
+      const nuevaPolizaId = await createPoliza(clienteId, valores, polizaRenovando.id);
+      if (archivoPolizaExtraida) {
+        try {
+          await subirDocumento(clienteId, nuevaPolizaId, archivoPolizaExtraida, "poliza");
+        } catch {
+          setError(
+            "La póliza se guardó correctamente, pero no se pudo adjuntar el PDF. Puede subirlo de nuevo desde los documentos de la póliza.",
+          );
+        }
+      }
+    } else if (polizaEditando) {
       await updatePoliza(clienteId, polizaEditando.id, valores);
       if (archivoPolizaExtraida) {
         try {
@@ -268,6 +279,8 @@ export function ClienteDetailPage() {
   }
 
   if (loading) return <Cargando mensaje="Cargando la ficha del cliente…" />;
+
+  const polizasVisibles = polizasActuales(polizas);
 
   return (
     <section className="mx-auto max-w-4xl space-y-8">
@@ -409,7 +422,7 @@ export function ClienteDetailPage() {
               <Shield className="size-5 text-primary" aria-hidden="true" />
               <h2 className="text-xl font-bold tracking-tight text-foreground">Pólizas asociadas</h2>
               <Badge variant="secondary" className="px-2 py-0 text-xs">
-                {polizas.length}
+                {polizasVisibles.length}
               </Badge>
             </div>
 
@@ -434,8 +447,7 @@ export function ClienteDetailPage() {
                       <p className="mt-0.5 text-amber-800">
                         Esto parece renovar la póliza N°{" "}
                         <span className="font-mono font-semibold">{polizaRenovando.numeroPoliza}</span> que vencía
-                        el <span className="font-semibold">{polizaRenovando.vigenciaFin}</span>. Se actualizará
-                        esa póliza en vez de crear una nueva.
+                        el <span className="font-semibold">{polizaRenovando.vigenciaFin}</span>. Se creará una nueva vigencia enlazada y la anterior quedará en el historial.
                       </p>
                     </div>
                   </div>
@@ -456,14 +468,14 @@ export function ClienteDetailPage() {
 
               <PolizaForm
                 inicial={extraccionPoliza ?? polizaEditando ?? undefined}
-                esEdicion={Boolean(polizaEditando)}
+                esEdicion={Boolean(polizaEditando) && !polizaRenovando}
                 onGuardar={handleGuardarPoliza}
                 onCancelar={cerrarFormularioPoliza}
               />
             </div>
           ) : null}
 
-          {polizas.length === 0 && !mostrarFormPoliza ? (
+          {polizasVisibles.length === 0 && !mostrarFormPoliza ? (
             <EmptyState
               icono={ShieldAlert}
               titulo="Este cliente todavía no tiene pólizas"
@@ -478,90 +490,109 @@ export function ClienteDetailPage() {
           ) : null}
 
           <div className="grid gap-4">
-            {polizas.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow duration-150 hover:shadow-sm sm:p-6"
-              >
-                {/* Cabecera de la Póliza */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h3 className="text-lg font-bold tracking-tight text-foreground">
-                        {p.aseguradora} · {p.tipoSeguro}
-                      </h3>
-                      <RenovacionBadge vigenciaFin={p.vigenciaFin} />
+            {polizasVisibles.map((p) => {
+              const historial = historialDe(p, polizas);
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-xl border border-border bg-card p-5 shadow-xs transition-shadow duration-150 hover:shadow-sm sm:p-6"
+                >
+                  {/* Cabecera de la Póliza */}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h3 className="text-lg font-bold tracking-tight text-foreground">
+                          {p.aseguradora} · {p.tipoSeguro}
+                        </h3>
+                        <RenovacionBadge vigenciaFin={p.vigenciaFin} />
+                      </div>
+                      <p className="mt-1 font-mono text-xs font-semibold text-muted-foreground">
+                        Póliza N° {p.numeroPoliza}
+                      </p>
                     </div>
-                    <p className="mt-1 font-mono text-xs font-semibold text-muted-foreground">
-                      Póliza N° {p.numeroPoliza}
-                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => abrirFormularioPoliza(p)}>
+                        <Pencil className="size-3.5" aria-hidden="true" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => void handleEliminarPoliza(p.id)}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        Eliminar
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => abrirFormularioPoliza(p)}>
-                      <Pencil className="size-3.5" aria-hidden="true" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => void handleEliminarPoliza(p.id)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                      Eliminar
-                    </Button>
+                  {/* Grilla de Detalles */}
+                  <div className="mt-4 grid gap-3 rounded-lg bg-muted/30 p-3.5 text-xs text-foreground sm:grid-cols-3 sm:text-sm">
+                    <div>
+                      <span className="block text-xs font-medium text-muted-foreground">Bien asegurado</span>
+                      <span className="mt-0.5 font-medium">{p.detalleBien || "—"}</span>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-medium text-muted-foreground">Vigencia</span>
+                      <span className="mt-0.5 inline-flex items-center gap-1 font-medium">
+                        <Calendar className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        {p.vigenciaInicio} al {p.vigenciaFin}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-medium text-muted-foreground">Prima anual</span>
+                      <span className="mt-0.5 inline-flex items-center font-semibold text-foreground">
+                        <DollarSign className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        {p.prima.toLocaleString("es", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    {p.corredor && (
+                      <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
+                        <span className="font-semibold text-muted-foreground">Corredor: </span>
+                        <span className="text-foreground">{p.corredor}</span>
+                      </div>
+                    )}
+
+                    {p.observaciones && (
+                      <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
+                        <span className="font-semibold text-muted-foreground">Observaciones: </span>
+                        <span className="text-foreground">{p.observaciones}</span>
+                      </div>
+                    )}
+
+                    {p.beneficios && (
+                      <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
+                        <span className="font-semibold text-muted-foreground">Beneficios: </span>
+                        <span className="text-foreground">{p.beneficios}</span>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Historial de vigencias anteriores */}
+                  {historial.length > 0 && (
+                    <details className="mt-3 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer font-medium hover:text-foreground">
+                        Vigencias anteriores ({historial.length})
+                      </summary>
+                      <ul className="mt-1.5 space-y-1 pl-2">
+                        {historial.map((h) => (
+                          <li key={h.id}>
+                            {h.vigenciaInicio} al {h.vigenciaFin} · Prima ${h.prima.toFixed(2)} · N° {h.numeroPoliza}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+
+                  {/* Documentos de la póliza */}
+                  <DocumentosPoliza clienteId={clienteId} polizaId={p.id} />
                 </div>
-
-                {/* Grilla de Detalles */}
-                <div className="mt-4 grid gap-3 rounded-lg bg-muted/30 p-3.5 text-xs text-foreground sm:grid-cols-3 sm:text-sm">
-                  <div>
-                    <span className="block text-xs font-medium text-muted-foreground">Bien asegurado</span>
-                    <span className="mt-0.5 font-medium">{p.detalleBien || "—"}</span>
-                  </div>
-
-                  <div>
-                    <span className="block text-xs font-medium text-muted-foreground">Vigencia</span>
-                    <span className="mt-0.5 inline-flex items-center gap-1 font-medium">
-                      <Calendar className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                      {p.vigenciaInicio} al {p.vigenciaFin}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="block text-xs font-medium text-muted-foreground">Prima anual</span>
-                    <span className="mt-0.5 inline-flex items-center font-semibold text-foreground">
-                      <DollarSign className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                      {p.prima.toLocaleString("es", { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
-                  {p.corredor && (
-                    <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
-                      <span className="font-semibold text-muted-foreground">Corredor: </span>
-                      <span className="text-foreground">{p.corredor}</span>
-                    </div>
-                  )}
-
-                  {p.observaciones && (
-                    <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
-                      <span className="font-semibold text-muted-foreground">Observaciones: </span>
-                      <span className="text-foreground">{p.observaciones}</span>
-                    </div>
-                  )}
-
-                  {p.beneficios && (
-                    <div className="sm:col-span-3 border-t border-border/40 pt-2 text-xs">
-                      <span className="font-semibold text-muted-foreground">Beneficios: </span>
-                      <span className="text-foreground">{p.beneficios}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Documentos de la póliza */}
-                <DocumentosPoliza clienteId={clienteId} polizaId={p.id} />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}

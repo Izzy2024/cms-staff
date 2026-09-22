@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, FileSpreadsheet, IdCard, Mail, Phone, Pin, Plus, Search, Users, X } from "lucide-react";
 import { actualizarEstadoManual, listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
-import { esClienteActivo, estadoClientePorFechas } from "../lib/renovaciones.ts";
+import { esClienteActivo, estadoClientePorFechas, polizasActuales } from "../lib/renovaciones.ts";
 import { cn } from "../lib/utils.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Button } from "../components/ui/button.tsx";
@@ -265,6 +265,7 @@ export function ClientesPage() {
       {!loading && !error && visibles.length > 0 ? (
         <div className="grid gap-3.5">
           {visibles.map(({ item: { cliente, polizas }, activo }) => {
+            const actuales = polizasActuales(polizas);
             const iniciales = obtenerIniciales(cliente.nombre);
             const esManual = cliente.activoManual !== null && cliente.activoManual !== undefined;
             const tituloEstado = esManual
@@ -345,8 +346,8 @@ export function ClientesPage() {
 
                   {/* Contador de pólizas + Flecha */}
                   <div className="flex items-center gap-2 self-end sm:self-center">
-                    <Badge variant={polizas.length > 0 ? "secondary" : "outline"} className="text-xs">
-                      {polizas.length} {polizas.length === 1 ? "póliza" : "pólizas"}
+                    <Badge variant={actuales.length > 0 ? "secondary" : "outline"} className="text-xs">
+                      {actuales.length} {actuales.length === 1 ? "póliza" : "pólizas"}
                     </Badge>
                     <ChevronRight
                       className="size-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
@@ -356,10 +357,10 @@ export function ClientesPage() {
                 </div>
 
                 {/* Vista previa de pólizas */}
-                {polizas.length > 0 ? (
+                {actuales.length > 0 ? (
                   <div className="mt-3.5 border-t border-border/60 pt-3">
                     <ul className="flex flex-col gap-2">
-                      {polizas.slice(0, 3).map((p) => (
+                      {actuales.slice(0, 3).map((p) => (
                         <li
                           key={p.id}
                           className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-1.5 text-xs text-foreground sm:text-sm"
@@ -373,9 +374,9 @@ export function ClientesPage() {
                           <RenovacionBadge vigenciaFin={p.vigenciaFin} />
                         </li>
                       ))}
-                      {polizas.length > 3 && (
+                      {actuales.length > 3 && (
                         <li className="text-right text-xs text-muted-foreground">
-                          +{polizas.length - 3} póliza(s) más…
+                          +{actuales.length - 3} póliza(s) más…
                         </li>
                       )}
                     </ul>
