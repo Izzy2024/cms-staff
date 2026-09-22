@@ -1,19 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Activity,
   AlertTriangle,
   Building2,
   Cake,
   Calendar,
+  Car,
   ChevronRight,
+  FileCheck,
   FileSpreadsheet,
   FileText,
+  Flame,
+  HeartPulse,
+  HelpCircle,
+  Package,
   Phone,
+  Plane,
+  Scale,
   ShieldCheck,
+  Stethoscope,
+  Truck,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { listClientesConPolizas } from "../lib/clientesRepo.ts";
 import type { ClienteConPolizas } from "../lib/clientesRepo.ts";
+import type { TipoSeguro } from "../lib/types.ts";
 import {
   contarClientesActivos,
   contarPolizasActivas,
@@ -29,6 +42,21 @@ import { MensajeError } from "../components/MensajeError.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Badge } from "../components/ui/badge.tsx";
+
+const ICONO_TIPO_SEGURO: Record<TipoSeguro, LucideIcon> = {
+  Auto: Car,
+  "Daños a Terceros": Car,
+  Incendio: Flame,
+  Contenido: Package,
+  Vida: HeartPulse,
+  "Accidentes Personales": Activity,
+  Salud: Stethoscope,
+  "Responsabilidad Civil": Scale,
+  Fianza: FileCheck,
+  "Equipo Pesado": Truck,
+  "Asistencia Viajera": Plane,
+  Otro: HelpCircle,
+};
 
 const MESES = [
   "enero",
@@ -175,6 +203,8 @@ export function DashboardPage() {
                     ? "border-l-4 border-l-amber-500"
                     : "border-l-4 border-l-blue-400";
 
+                  const IconoTipo = ICONO_TIPO_SEGURO[item.poliza.tipoSeguro] ?? HelpCircle;
+
                   return (
                     <Link
                       key={`${item.clienteId}-${item.poliza.id}`}
@@ -198,7 +228,10 @@ export function DashboardPage() {
                               {item.poliza.aseguradora}
                             </span>
                             <span className="text-muted-foreground/60">•</span>
-                            <span>{item.poliza.tipoSeguro}</span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <IconoTipo className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              {item.poliza.tipoSeguro}
+                            </span>
                             <span className="text-muted-foreground/60">•</span>
                             <span className="inline-flex items-center gap-1 font-mono text-xs sm:text-sm text-foreground">
                               <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
