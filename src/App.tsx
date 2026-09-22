@@ -1,14 +1,26 @@
+import { lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext.tsx";
 import { Layout } from "./components/Layout.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { LoginPage } from "./pages/LoginPage.tsx";
 import { DefinirContrasenaPage } from "./pages/DefinirContrasenaPage.tsx";
-import { DashboardPage } from "./pages/DashboardPage.tsx";
-import { ClientesPage } from "./pages/ClientesPage.tsx";
-import { ClienteDetailPage } from "./pages/ClienteDetailPage.tsx";
-import { ImportarPage } from "./pages/ImportarPage.tsx";
-import { PerfilPage } from "./pages/PerfilPage.tsx";
+
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage.tsx").then((m) => ({ default: m.DashboardPage })),
+);
+const ClientesPage = lazy(() =>
+  import("./pages/ClientesPage.tsx").then((m) => ({ default: m.ClientesPage })),
+);
+const ClienteDetailPage = lazy(() =>
+  import("./pages/ClienteDetailPage.tsx").then((m) => ({ default: m.ClienteDetailPage })),
+);
+const ImportarPage = lazy(() =>
+  import("./pages/ImportarPage.tsx").then((m) => ({ default: m.ImportarPage })),
+);
+const PerfilPage = lazy(() =>
+  import("./pages/PerfilPage.tsx").then((m) => ({ default: m.PerfilPage })),
+);
 
 export default function App() {
   return (

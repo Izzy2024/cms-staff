@@ -1,5 +1,4 @@
 import { supabase } from "./supabase";
-import { renderizarPaginasComoImagenes } from "./renderizarPdf";
 import { TIPOS_SEGURO } from "./types";
 import type { TipoSeguro } from "./types";
 
@@ -147,6 +146,7 @@ export async function extraerPolizaDesdeArchivo(
 ): Promise<ResultadoExtraccion> {
   let imagenes: string[];
   try {
+    const { renderizarPaginasComoImagenes } = await import("./renderizarPdf");
     imagenes = await renderizarPaginasComoImagenes(archivo);
   } catch {
     throw new Error(ERROR_GENERICO);
