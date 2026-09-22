@@ -15,6 +15,7 @@ import {
   Flame,
   HeartPulse,
   HelpCircle,
+  MessageCircle,
   Package,
   Phone,
   Plane,
@@ -37,6 +38,7 @@ import {
 } from "../lib/renovaciones.ts";
 import type { ItemRenovacion } from "../lib/renovaciones.ts";
 import { descargarExcel, filasRenovaciones } from "../lib/exportarExcel.ts";
+import { enlaceWhatsApp, mensajeCumpleanos, mensajeRenovacion } from "../lib/whatsapp.ts";
 import { cn } from "../lib/utils.ts";
 import { RenovacionBadge } from "../components/RenovacionBadge.tsx";
 import { Cargando } from "../components/Cargando.tsx";
@@ -100,8 +102,11 @@ export function DashboardPage() {
       setExportando(true);
       setErrorExportar("");
       const filas = filasRenovaciones(renovaciones, clientesConPolizas);
-      const hoy = new Date().toISOString().slice(0, 10);
-      await descargarExcel(filas, `renovaciones-${hoy}.xlsx`);
+      const hoy = new Date();
+      const anio = hoy.getFullYear();
+      const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+      const dia = String(hoy.getDate()).padStart(2, "0");
+      await descargarExcel(filas, `renovaciones-${anio}-${mes}-${dia}.xlsx`);
     } catch {
       setErrorExportar("No se pudo generar el archivo de Excel. Intente de nuevo.");
     } finally {
@@ -233,64 +238,82 @@ export function DashboardPage() {
                     : "border-l-4 border-l-blue-400";
 
                   const IconoTipo = ICONO_TIPO_SEGURO[item.poliza.tipoSeguro] ?? HelpCircle;
+                  const urlWhatsApp = enlaceWhatsApp(
+                    item.clienteTelefono,
+                    mensajeRenovacion(item.clienteNombre, item.poliza, item.diasRestantes),
+                  );
 
                   return (
-                    <Link
+                    <div
                       key={`${item.clienteId}-${item.poliza.id}`}
-                      to={`/clientes/${item.clienteId}`}
-                      className="group block"
+                      className={`group relative flex flex-col gap-3.5 rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-150 hover:border-foreground/25 hover:shadow-sm active:scale-[0.995] focus-within:ring-2 focus-within:ring-ring sm:flex-row sm:items-center sm:justify-between sm:gap-6 ${acentoBorde}`}
                     >
-                      <div
-                        className={`flex flex-col gap-3.5 rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all duration-150 hover:border-foreground/25 hover:shadow-sm active:scale-[0.995] sm:flex-row sm:items-center sm:justify-between sm:gap-6 ${acentoBorde}`}
-                      >
-                        <div className="flex min-w-0 flex-1 flex-col gap-2">
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <h2 className="text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <h2 className="text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
+                            <Link
+                              to={`/clientes/${item.clienteId}`}
+                              className="after:absolute after:inset-0 focus-visible:outline-none"
+                            >
                               {item.clienteNombre}
-                            </h2>
-                            <RenovacionBadge diasRestantes={item.diasRestantes} />
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:text-base">
-                            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                              <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                              {item.poliza.aseguradora}
-                            </span>
-                            <span className="text-muted-foreground/60">•</span>
-                            <span className="inline-flex items-center gap-1.5">
-                              <IconoTipo className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                              {item.poliza.tipoSeguro}
-                            </span>
-                            <span className="text-muted-foreground/60">•</span>
-                            <span className="inline-flex items-center gap-1 font-mono text-xs sm:text-sm text-foreground">
-                              <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                              {item.poliza.numeroPoliza}
-                            </span>
-                          </div>
-
-                          {item.poliza.detalleBien ? (
-                            <p className="text-xs sm:text-sm text-muted-foreground">
-                              {item.poliza.detalleBien}
-                            </p>
-                          ) : null}
-
-                          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                            <Calendar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                            <span>
-                              Vence:{" "}
-                              <strong className="font-semibold text-foreground">
-                                {item.poliza.vigenciaFin}
-                              </strong>{" "}
-                              ({textoDiasRestantes(item.diasRestantes)})
-                            </span>
-                          </div>
+                            </Link>
+                          </h2>
+                          <RenovacionBadge diasRestantes={item.diasRestantes} />
                         </div>
 
-                        <div className="flex shrink-0 items-center justify-end text-muted-foreground transition-transform duration-150 group-hover:translate-x-1 group-hover:text-foreground sm:pl-2">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground sm:text-base">
+                          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            {item.poliza.aseguradora}
+                          </span>
+                          <span className="text-muted-foreground/60">•</span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <IconoTipo className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            {item.poliza.tipoSeguro}
+                          </span>
+                          <span className="text-muted-foreground/60">•</span>
+                          <span className="inline-flex items-center gap-1 font-mono text-xs sm:text-sm text-foreground">
+                            <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            {item.poliza.numeroPoliza}
+                          </span>
+                        </div>
+
+                        {item.poliza.detalleBien ? (
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            {item.poliza.detalleBien}
+                          </p>
+                        ) : null}
+
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                          <Calendar className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span>
+                            Vence:{" "}
+                            <strong className="font-semibold text-foreground">
+                              {item.poliza.vigenciaFin}
+                            </strong>{" "}
+                            ({textoDiasRestantes(item.diasRestantes)})
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center justify-end gap-2 text-muted-foreground sm:pl-2">
+                        {urlWhatsApp ? (
+                          <a
+                            href={urlWhatsApp}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Enviar recordatorio por WhatsApp a ${item.clienteNombre}`}
+                            className="relative z-10 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border/90 bg-background px-3 text-sm font-medium text-foreground shadow-2xs transition-all duration-150 hover:border-border hover:bg-muted/70 hover:text-foreground active:bg-muted focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-foreground/15"
+                          >
+                            <MessageCircle className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : null}
+                        <div className="transition-transform duration-150 group-hover:translate-x-1 group-hover:text-foreground">
                           <ChevronRight className="size-5" aria-hidden="true" />
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
@@ -318,31 +341,51 @@ export function DashboardPage() {
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
-                  {cumpleanosProximos.map((c) => (
-                    <li
-                      key={c.clienteId}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2"
-                    >
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                        <Link
-                          to={`/clientes/${c.clienteId}`}
-                          className="truncate text-sm font-medium text-foreground hover:text-primary"
-                        >
-                          {c.clienteNombre}
-                        </Link>
-                        {c.clienteTelefono ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Phone className="size-3.5 shrink-0" aria-hidden="true" />
-                            {c.clienteTelefono}
+                  {cumpleanosProximos.map((c) => {
+                    const urlWhatsApp = enlaceWhatsApp(
+                      c.clienteTelefono,
+                      mensajeCumpleanos(c.clienteNombre),
+                    );
+
+                    return (
+                      <li
+                        key={c.clienteId}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2"
+                      >
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                          <Link
+                            to={`/clientes/${c.clienteId}`}
+                            className="truncate text-sm font-medium text-foreground hover:text-primary"
+                          >
+                            {c.clienteNombre}
+                          </Link>
+                          {c.clienteTelefono ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Phone className="size-3.5 shrink-0" aria-hidden="true" />
+                              {c.clienteTelefono}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
+                            <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
+                            {c.dia} de {MESES[c.mes - 1]}
                           </span>
-                        ) : null}
-                      </div>
-                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
-                        <Calendar className="size-3.5 shrink-0" aria-hidden="true" />
-                        {c.dia} de {MESES[c.mes - 1]}
-                      </span>
-                    </li>
-                  ))}
+                          {urlWhatsApp ? (
+                            <a
+                              href={urlWhatsApp}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Enviar saludo de cumpleaños por WhatsApp a ${c.clienteNombre}`}
+                              className="inline-flex size-7 items-center justify-center rounded-md border border-border/80 bg-background text-emerald-600 transition-colors hover:bg-muted hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            >
+                              <MessageCircle className="size-3.5" aria-hidden="true" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

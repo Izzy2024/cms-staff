@@ -5,6 +5,7 @@ import type { Cliente, Poliza } from "./types.ts";
 export interface ItemRenovacion {
   clienteId: string;
   clienteNombre: string;
+  clienteTelefono?: string;
   poliza: Poliza;
   diasRestantes: number;
 }
@@ -129,6 +130,7 @@ export function obtenerRenovacionesProximas(
         items.push({
           clienteId: cliente.id,
           clienteNombre: cliente.nombre,
+          clienteTelefono: cliente.telefono || undefined,
           poliza,
           diasRestantes: dias,
         });
