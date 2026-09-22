@@ -123,13 +123,25 @@ export function parsePrima(valor: unknown): number {
     return Number.isFinite(valor) ? Math.max(0, valor) : 0;
   }
   if (!valor) return 0;
-  let str = String(valor).trim().replace(/[^0-9.,-]/g, "");
+  let str = String(valor)
+    .trim()
+    .replace(/[^0-9.,-]/g, "")
+    .replace(/^[.,]+|[.,]+$/g, "");
   if (!str) return 0;
-  if (str.includes(",") && str.includes(".")) {
-    str = str.replace(/,/g, "");
-  } else if (str.includes(",")) {
-    str = str.replace(",", ".");
+
+  const tieneComa = str.includes(",");
+  const tienePunto = str.includes(".");
+
+  if (tieneComa && tienePunto) {
+    const decimal = str.lastIndexOf(",") > str.lastIndexOf(".") ? "," : ".";
+    const miles = decimal === "," ? "." : ",";
+    str = str.split(miles).join("").replace(decimal, ".");
+  } else if (tieneComa) {
+    str = /^\d{1,3}(,\d{3})+$/.test(str) ? str.replace(/,/g, "") : str.replace(",", ".");
+  } else if (tienePunto) {
+    str = /^\d{1,3}(\.\d{3}){2,}$/.test(str) ? str.replace(/\./g, "") : str;
   }
+
   const parsed = parseFloat(str);
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
