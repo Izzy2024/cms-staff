@@ -64,14 +64,30 @@ function polizaAFila(data: Omit<Poliza, "id" | "clienteId">) {
   };
 }
 
+const PAGINA = 1000;
+
+// ponytail: asume el max-rows por defecto de Supabase (1000); si se baja en el dashboard, bajar PAGINA.
+async function traerTodasLasFilas(tabla: "clientes" | "polizas") {
+  const primera = await supabase.from(tabla).select("*").order("id").range(0, PAGINA - 1);
+  if (primera.error) throw primera.error;
+  const filas = [...(primera.data ?? [])];
+  for (let desde = PAGINA; filas.length === desde; desde += PAGINA) {
+    const { data, error } = await supabase
+      .from(tabla)
+      .select("*")
+      .order("id")
+      .range(desde, desde + PAGINA - 1);
+    if (error) throw error;
+    filas.push(...(data ?? []));
+  }
+  return filas;
+}
+
 export async function listClientesConPolizas(): Promise<ClienteConPolizas[]> {
-  const [{ data: clientes, error: errorClientes }, { data: polizas, error: errorPolizas }] =
-    await Promise.all([
-      supabase.from("clientes").select("*"),
-      supabase.from("polizas").select("*"),
-    ]);
-  if (errorClientes) throw errorClientes;
-  if (errorPolizas) throw errorPolizas;
+  const [clientes, polizas] = await Promise.all([
+    traerTodasLasFilas("clientes"),
+    traerTodasLasFilas("polizas"),
+  ]);
 
   const polizasPorCliente = new Map<string, Poliza[]>();
   for (const fila of polizas ?? []) {
