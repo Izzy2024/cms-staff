@@ -35,7 +35,16 @@ export function DefinirContrasenaPage() {
       verificacionIniciada.current = true;
       supabase.auth
         .verifyOtp({ token_hash: tokenHash, type })
-        .then(({ error: verifyError }) => setEstado(verifyError ? "invalido" : "listo"))
+        .then(({ error: verifyError }) => {
+          if (!verifyError) {
+            setEstado("listo");
+            return;
+          }
+          supabase.auth
+            .getSession()
+            .then(({ data }) => setEstado(data.session ? "listo" : "invalido"))
+            .catch(() => setEstado("invalido"));
+        })
         .catch(() => setEstado("invalido"));
       return;
     }
