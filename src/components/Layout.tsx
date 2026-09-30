@@ -50,7 +50,7 @@ export function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50/60 dark:bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Link
@@ -63,7 +63,7 @@ export function Layout() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold tracking-tight text-foreground">
-                CMS Seguros
+                Staff Seguros
               </span>
             </div>
           </Link>
@@ -164,7 +164,7 @@ export function Layout() {
       </main>
 
       <footer className="border-t border-border/60 bg-background/50 py-4 text-center text-xs text-muted-foreground">
-        CMS Seguros · Sistema de Gestión de Cartera
+        Staff Seguros · Sistema de Gestión de Cartera
       </footer>
     </div>
   );

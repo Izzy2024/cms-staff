@@ -84,7 +84,7 @@ export function DefinirContrasenaPage() {
 
   if (loading || estado === "verificando") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50/50">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Cargando mensaje="Verificando el enlace…" />
       </div>
     );
@@ -93,7 +93,7 @@ export function DefinirContrasenaPage() {
   const esInvalido = estado === "invalido";
 
   return (
-    <div className="flex min-h-screen w-full flex-col justify-center bg-zinc-50/60 px-4 py-12 dark:bg-background">
+    <div className="flex min-h-screen w-full flex-col justify-center bg-background px-4 py-12">
       <div className="mx-auto w-full max-w-md">
         <div className="text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
