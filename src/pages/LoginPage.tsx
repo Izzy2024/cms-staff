@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate, useLocation, Navigate, Link } from "react-router-dom";
+import { useLocation, Navigate, Link } from "react-router-dom";
 import { CheckCircle2, Lock, LogIn, Send, Shield } from "lucide-react";
 import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
@@ -29,8 +29,8 @@ function getErrorMessage(code: string | undefined): string {
 
 export function LoginPage() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -47,7 +47,7 @@ export function LoginPage() {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={from} replace />;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -63,9 +63,6 @@ export function LoginPage() {
       setSubmitting(false);
       return;
     }
-    const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
-    navigate(from, { replace: true });
-    setSubmitting(false);
   }
 
   async function handleEnviarEnlace(event: FormEvent<HTMLFormElement>): Promise<void> {
