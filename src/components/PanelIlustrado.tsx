@@ -1,7 +1,9 @@
 import familia from "../assets/familia.webp";
 
+// Grano de papel en SVG (feTurbulence) para que el dibujo parezca hecho sobre papel
 const GRANO_PAPEL = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .18 0 0 0 .45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
 
+// Mitad ilustrada: el dibujo a lápiz sobre papel cálido, como página de álbum
 export function PanelIlustrado() {
   return (
     <aside className="sticky top-0 hidden h-screen flex-col overflow-hidden bg-[#efe6d5] text-[#3b2f24] lg:flex">

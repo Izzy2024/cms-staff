@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useLocation, Navigate, Link } from "react-router-dom";
+import { useLocation, Navigate } from "react-router-dom";
 import { CheckCircle2, Lock, LogIn, Send, Shield } from "lucide-react";
 import { supabase } from "../lib/supabase.ts";
 import { useAuth } from "../auth/AuthContext.tsx";
@@ -226,16 +226,6 @@ export function LoginPage() {
               <span>Acceso seguro para agentes autorizados</span>
             </div>
           </div>
-
-          <p className="mt-5 text-center text-sm text-muted-foreground">
-            <Link
-              to="/dashboard"
-              className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
-            >
-              Ir al panel
-            </Link>{" "}
-            (requiere iniciar sesión)
-          </p>
         </div>
       </main>
     </div>
